@@ -1,7 +1,7 @@
 name:                solga
 version:             0.1.0.0
 synopsis:            Simple typesafe web routing
--- description:
+description:         A library for easily specifying web APIs and implementing them in a type-safe way.
 license:             MIT
 license-file:        LICENSE
 author:              Patrick Chilton
@@ -16,7 +16,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Solga
-  build-depends:       base,
+  build-depends:       base >= 4.8 && < 5,
                        text,
                        wai,
                        bytestring,
