@@ -1,0 +1,17 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>network-2.6.2.1: Low-level networking interface</title><link href="ocean.css" rel="stylesheet" type="text/css" title="Ocean" /><script src="haddock-util.js" type="text/javascript"></script><script type="text/javascript">//<![CDATA[
+window.onload = function () {pageLoad();};
+//]]>
+</script></head><body><div id="package-header"><ul class="links" id="page-menu"><li><a href="index.html">Contents</a></li><li><a href="doc-index.html">Index</a></li></ul><p class="caption">network-2.6.2.1: Low-level networking interface</p></div><div id="content"><div id="description"><h1>network-2.6.2.1: Low-level networking interface</h1><div class="doc"><p>This package provides a low-level networking interface.</p><p>In network-2.6 the <code>Network.URI</code> module was split off into its own
+package, network-uri-2.6. If you're using the <code>Network.URI</code> module
+you can automatically get it from the right package by adding this
+to your .cabal file:</p><pre>flag network-uri
+  description: Get Network.URI from the network-uri package
+  default: True
+
+library
+  -- ...
+  if flag(network-uri)
+    build-depends: network-uri &gt;= 2.6, network &gt;= 2.6
+  else
+    build-depends: network-uri &lt; 2.6, network &lt; 2.6</pre><p>That is, get the module from either network &lt; 2.6 or from
+network-uri &gt;= 2.6.</p></div></div><div id="module-list"><p class="caption">Modules</p><ul><li><span class="module"><span id="control.n.1" class="collapser" onclick="toggleSection('n.1')">&nbsp;</span><a href="Network.html">Network</a></span><ul id="section.n.1" class="show"><li><span class="module"><a href="Network-BSD.html">Network.BSD</a></span></li><li><span class="module"><span id="control.n.1.2" class="collapser" onclick="toggleSection('n.1.2')">&nbsp;</span><a href="Network-Socket.html">Network.Socket</a></span><ul id="section.n.1.2" class="show"><li><span class="module"><span id="control.n.1.2.1" class="collapser" onclick="toggleSection('n.1.2.1')">&nbsp;</span><a href="Network-Socket-ByteString.html">Network.Socket.ByteString</a></span><ul id="section.n.1.2.1" class="show"><li><span class="module"><a href="Network-Socket-ByteString-Lazy.html">Network.Socket.ByteString.Lazy</a></span></li></ul></li><li><span class="module"><a href="Network-Socket-Internal.html">Network.Socket.Internal</a></span></li></ul></li></ul></li></ul></div></div><div id="footer"><p>Produced by <a href="http://www.haskell.org/haddock/">Haddock</a> version 2.16.1</p></div></body></html>
