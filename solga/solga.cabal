@@ -28,3 +28,25 @@ library
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -Wall
+
+test-suite solga-tests
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Test.hs
+  ghc-options:         -Wall
+  default-language:    Haskell2010
+  build-depends:       base
+                     , text
+                     , solga
+                     , wai
+                     , wai-extra
+                     , aeson
+                     , hspec
+                     , hspec-wai
+                     , hspec-wai-json
+                     , http-types
+                     , unordered-containers
+                     , hashable
+                     , vector
+                     , scientific
+                     , QuickCheck
