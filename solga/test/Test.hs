@@ -15,6 +15,8 @@ import           Test.Hspec.Wai.QuickCheck
 import           Test.QuickCheck (genericShrink)
 
 import           Data.Aeson hiding (json)
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Builder as BSB
 import           Data.Hashable
 import qualified Data.Scientific as S
 import qualified Data.Text as T
@@ -22,6 +24,7 @@ import qualified Data.HashMap.Strict as HMS
 import qualified Data.Vector as V
 import           Data.Traversable
 import           GHC.Generics (Generic)
+import           Network.HTTP.Types.URI
 import           Network.Wai.Test
 
 import           Solga
@@ -33,6 +36,7 @@ data TestAPI = TestAPI
   { basic :: "basic" /> Get T.Text
   , echoJSON :: "echo-json" /> ReqBodyJSON Value :> Post Value
   , internalError :: "fubar" /> Get T.Text
+  , echoCapture :: "echo-capture" /> Capture T.Text :> Get T.Text
   } deriving (Generic)
 instance Router TestAPI
 
@@ -41,10 +45,12 @@ testAPI = TestAPI
   { basic = brief (return "basic")
   , echoJSON = brief return
   , internalError = brief (return $ error "quality programming")
+  , echoCapture = brief return
   }
 
 spec :: Spec
 spec = with (return $ serve testAPI) $ do
+  -- tests basic routing
   describe "GET /basic" $ do
     it "responds with 200" $ do
       get "/basic" `shouldRespondWith` 200
@@ -59,6 +65,7 @@ spec = with (return $ serve testAPI) $ do
     it "responds with 404" $ do
       get "/doesnt-exist" `shouldRespondWith` 404
 
+  -- tests ReqBodyJSON and JSON
   describe "POST /echo-json" $ do
     it "responds with 200" $
       post "/echo-json" [json|"test"|] `shouldRespondWith` 200
@@ -71,9 +78,20 @@ spec = with (return $ serve testAPI) $ do
       resp <- post "/echo-json" (encode val)
       liftIO $ decode (simpleBody resp) `shouldBe` Just (val :: Value)
 
+  -- tests exception handling
   describe "GET /fubar" $ do
     it "responds with 500" $
       get "/fubar" `shouldRespondWith` 500
+
+  -- tests Capture
+  describe "GET /echo-capture" $ do
+    it "responds with 200" $
+      get "/echo-capture/test" `shouldRespondWith` 200
+
+    it "responds with captured segment" $ property $ \seg -> do
+      let path = LBS.toStrict $ BSB.toLazyByteString $ encodePathSegments [ "echo-capture", seg ]
+      resp <- get path
+      liftIO $ decode (simpleBody resp) `shouldBe` Just (String seg)
 
 deriving instance Generic Value
 
