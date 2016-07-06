@@ -100,10 +100,13 @@ tryRouteNextIO f req = do
 
 -- | Serve a `Router` with Solga, returning `SolgaError`s as HTTP responses.
 serve :: Router r => r -> Wai.Application
-serve router req cont = catch (serveThrow router req cont) $ \case
-  SolgaError { errorStatus, errorMessage } ->
-    cont $ Wai.responseBuilder errorStatus [] $
-      Builder.byteString $ encodeUtf8 errorMessage
+serve router req cont = serveThrow router req cont `catches`
+  [ Handler $ \SolgaError { errorStatus, errorMessage } ->
+      cont $ Wai.responseBuilder errorStatus [] $
+        Builder.byteString $ encodeUtf8 errorMessage
+  , Handler $ \(SomeException _) ->
+      cont $ Wai.responseBuilder HTTP.internalServerError500 [] mempty
+  ]
 
 -- | Serve a `Router` with Solga, throwing `SolgaError`s.
 serveThrow :: Router r => r -> Wai.Application
