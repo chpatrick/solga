@@ -8,13 +8,13 @@ A library for easily specifying web APIs and implementing them in a type-safe wa
 
 At the center of Solga is a typeclass called `Router`. You can serve any `Router` as a WAI application:
 
-```
+```haskell
 serve :: Router r => r -> Wai.Application
 ```
 
 `Router`s are generally simple `newtypes`. For example, to serve a fixed JSON response, just use:
 
-```
+```haskell
 -- From Solga:
 newtype JSON a = JSON {jsonResponse :: a}
 
@@ -24,7 +24,7 @@ This router will respond to every request with the given `jsonResponse`, ie. `se
 
 Routers can also be composed. Let's say you only want to respond to GET requests under `/does-it-work`. We'll encode the path and the method in the type itself with `DataKinds`.
 
-```
+```haskell
 type MyAPI = Seg "does-it-work" (Method "GET" (JSON Text))
 
 myAPI :: MyAPI
@@ -33,7 +33,7 @@ myAPI = Seg (Method (JSON "It works"))
 
 There's some syntactic sugar we can apply here. First, let's use the `:>` operator to compose our routers. This is the same as type application.
 
-```
+```haskell
 -- From Solga:
 -- type f :> g = f g
 
@@ -42,7 +42,7 @@ type MyAPI = Seg "does-it-work" :> Method "GET" :> JSON Text
 
 Second, we can replace `Seg` with `/>`:
 
-```
+```haskell
 -- From Solga:
 -- type (/>) (seg :: Symbol) g = Seg seg :> g
 
@@ -51,14 +51,14 @@ type MyAPI = "does-it-work" /> Method "GET" :> JSON Text
 
 And third, we can get rid of the constructor boilerplate using `brief`:
 
-```
+```haskell
 myAPI :: MyAPI
 myAPI = brief "It works!"
 ```
 
 What if we want to serve multiple different routes? It's easy - any product of Routers is automatically a Router, and Solga will try each field in order:
 
-```
+```haskell
 data MyAPI = MyAPI
   { doesItWork :: "does-it-work" /> Method "GET" :> JSON Text
   , whatAboutThis :: "what-about-this" /> Method "GET" :> JSON Text
@@ -75,7 +75,7 @@ myAPI = MyAPI
 
 We can nest these record routers as expected:
 
-```
+```haskell
 data UserAPI = UserAPI {..}
 data WidgetAPI = WidgetAPI {..}
 
@@ -87,7 +87,7 @@ data MyAPI = MyAPI
 
 What if we want to capture a path segment? Let's see:
 
-```
+```haskell
 -- newtype Capture a next = Capture {captureNext :: a -> next}
 
 data MyAPI = MyAPI
@@ -104,7 +104,7 @@ myAPI = MyAPI
 
 How about doing IO?
 
-```
+```haskell
 data MyAPI = MyAPI
   { rng :: "rng" /> Method "GET" :> WithIO :> JSON Int
   } deriving (Generic)
@@ -121,7 +121,7 @@ Solga comes with a large set of useful Routers for parsing request bodies and pr
 
 ## Creating Routers
 To create a router yourself, just implement the Router typeclass:
-```
+```haskell
 -- | The right hand side of `Application`. `Request` is already known.
 type Responder = (Wai.Response -> IO Wai.ResponseReceived) -> IO Wai.ResponseReceived
 
@@ -139,7 +139,7 @@ This is why the type of `tryRoute` is `Wai.Request -> Maybe (r -> Responder)`. T
 
 For example, here is the implementation of the `JSON` router:
 
-```
+```haskell
 instance Aeson.ToJSON a => Router (JSON a) where
   tryRoute _ = Just $ \json cont ->
     cont $ Wai.responseBuilder HTTP.status200 headers $ Aeson.encodeToBuilder $ Aeson.toJSON $ jsonResponse json
@@ -147,13 +147,13 @@ instance Aeson.ToJSON a => Router (JSON a) where
 ```
 
 `tryRouteNext` is a very useful function for implementing routers:
-```
+```haskell
 tryRouteNext :: Router r' => (r -> r') -> Wai.Request -> Maybe (r -> Responder)
 tryRouteNextIO :: Router r' => (r -> IO r') -> Wai.Request -> Maybe (r -> Responder)
 ```
 
 Essentially, if you can convert from your type `r` to another Router type `r'`, you get the implementation for `tryRoute` for free. With this, it's easy to implement the Servant "fish operator":
-```
+```haskell
 data left :<|> right = (:<|>) { altLeft :: left, altRight :: right }
   deriving (Eq, Ord, Show)
 
@@ -165,7 +165,7 @@ instance (Router left, Router right) => Router (left :<|> right) where
 
 Or `Seg`:
 
-```
+```haskell
 newtype Seg (seg :: Symbol) next = Seg { segNext :: next }
   deriving (Eq, Ord, Show)
 
