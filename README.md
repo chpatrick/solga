@@ -177,4 +177,10 @@ instance (KnownSymbol seg, Router next) => Router (Seg seg next) where
 ```
 
 ## Swagger and client generation
-It is also possible to generate Swagger specifications and TypeScript clients for Solga types. This has been implemented and will be published soon. Stay tuned!
+You can also generate [Swagger](http://swagger.io/) specifications for your API for free. Just use the `solga-swagger` package, derive `RouterSwagger` the same way as `Router`, and use the `genSwagger` function to get your specification.
+
+```haskell
+genSwagger :: RouterSwagger r => Proxy r -> Either (Text, Context) Swagger
+```
+
+It's possible for an API type to not be specific enough (not matching a Method), or to be inconsistent (matching two different request bodies). In this case, an error will be returned.
