@@ -50,7 +50,7 @@ module Solga
   ) where
 
 import           Control.Applicative
-import           Control.Exception
+import           Control.Exception.Safe
 import           Control.Monad
 import           Control.Monad.Trans.Resource
 import qualified Data.Aeson as Aeson
@@ -100,13 +100,12 @@ tryRouteNextIO f req = do
 
 -- | Serve a `Router` with Solga, returning `SolgaError`s as HTTP responses.
 serve :: Router r => r -> Wai.Application
-serve router req cont = serveThrow router req cont `catches`
-  [ Handler $ \SolgaError { errorStatus, errorMessage } ->
+serve router req cont = serveThrow router req cont
+  `catch` (\SolgaError { errorStatus, errorMessage } ->
       cont $ Wai.responseBuilder errorStatus [] $
-        Builder.byteString $ encodeUtf8 errorMessage
-  , Handler $ \(SomeException _) ->
-      cont $ Wai.responseBuilder HTTP.internalServerError500 [] mempty
-  ]
+        Builder.byteString $ encodeUtf8 errorMessage)
+  `catchAny` (\(SomeException _) ->
+      cont $ Wai.responseBuilder HTTP.internalServerError500 [] mempty)
 
 -- | Serve a `Router` with Solga, throwing `SolgaError`s.
 serveThrow :: Router r => r -> Wai.Application
