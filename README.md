@@ -1,6 +1,6 @@
 # Solga: simple typesafe routing [![Build Status](https://travis-ci.org/chpatrick/solga.svg?branch=master)](https://travis-ci.org/chpatrick/solga)
 
-[Haddock](http://chpatrick.github.io/solga/doc/solga-0.1.0.0/Solga.html) | Hackage: [solga](https://hackage.haskell.org/package/solga) / [solga-swagger](https://hackage.haskell.org/package/solga-swagger)
+[Haddock](https://www.stackage.org/haddock/nightly-2016-07-11/solga-0.1.0.1/Solga.html) | Hackage: [solga](https://hackage.haskell.org/package/solga) / [solga-swagger](https://hackage.haskell.org/package/solga-swagger) | Stackage: [solga](https://www.stackage.org/package/solga) / [solga-swagger](https://www.stackage.org/package/solga-swagger)
 
 A library for easily specifying web APIs and implementing them in a type-safe way.
 
