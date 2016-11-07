@@ -205,7 +205,7 @@ newtype JSON a = JSON { jsonResponse :: a }
 
 instance Aeson.ToJSON a => Router (JSON a) where
   tryRoute _ = Just $ \json cont ->
-    cont $ Wai.responseBuilder HTTP.status200 headers $ Aeson.encodeToBuilder $ Aeson.toJSON $ jsonResponse json
+    cont $ Wai.responseBuilder HTTP.status200 headers $ Aeson.fromEncoding $ Aeson.toEncoding $ jsonResponse json
       where headers = [ ( HTTP.hContentType, "application/json" ) ]
 
 -- | Set extra headers on responses.
