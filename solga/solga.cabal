@@ -21,7 +21,7 @@ library
                        wai,
                        bytestring,
                        containers,
-                       aeson,
+                       aeson >= 1.0.0.0,
                        wai-extra,
                        http-types,
                        resourcet,
