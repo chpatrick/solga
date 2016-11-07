@@ -1,5 +1,5 @@
 name:                solga-swagger
-version:             0.1.0.1
+version:             0.1.0.2
 synopsis:            Swagger generation for Solga
 description:         Swagger generation for Solga
 license:             MIT
