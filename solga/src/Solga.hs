@@ -283,7 +283,7 @@ class Abbreviated a where
   type Brief a :: *
   type instance Brief a = a
   brief :: Brief a -> a
-  default brief :: a -> a
+  default brief :: Brief a ~ a => Brief a -> a
   brief = id
 
 instance Abbreviated Raw where
