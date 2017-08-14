@@ -42,6 +42,7 @@ module Solga
   , SolgaError
   , badRequest
   , unauthorized
+  , forbidden
   , notFound
   , internalServerError
   -- * Router implementation
@@ -371,6 +372,13 @@ badRequest msg = SolgaError
 unauthorized :: Text.Text -> SolgaError
 unauthorized msg = SolgaError
   { errorStatus = HTTP.unauthorized401
+  , errorMessage = msg
+  }
+
+-- | Create a @403 Forbidden@ error with a given message.
+forbidden :: Text.Text -> SolgaError
+forbidden msg = SolgaError
+  { errorStatus = HTTP.forbidden403
   , errorMessage = msg
   }
 
