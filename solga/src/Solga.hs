@@ -42,6 +42,7 @@ module Solga
   , SolgaError
   , badRequest
   , notFound
+  , internalServerError
   -- * Router implementation
   , Router(..)
   , Responder
@@ -54,7 +55,6 @@ import           Control.Exception.Safe
 import           Control.Monad
 import           Control.Monad.Trans.Resource
 import qualified Data.Aeson as Aeson
-import qualified Data.Aeson.Encode as Aeson
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Char8 as Char8
 import qualified Data.Map.Strict as Map
@@ -370,5 +370,12 @@ badRequest msg = SolgaError
 notFound :: Text.Text -> SolgaError
 notFound msg = SolgaError
   { errorStatus = HTTP.notFound404
+  , errorMessage = msg
+  }
+
+-- | Create a @500 Internal Server Error@ error with a given message.
+internalServerError :: Text.Text -> SolgaError
+internalServerError msg = SolgaError
+  { errorStatus = HTTP.internalServerError500
   , errorMessage = msg
   }
