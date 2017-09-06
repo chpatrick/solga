@@ -7,6 +7,8 @@ resolver: nightly-2017-07-31
 packages:
 - 'solga'
 - 'solga-swagger'
+- 'solga-core'
+- 'solga-router'
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:

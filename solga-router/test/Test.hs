@@ -27,7 +27,8 @@ import           GHC.Generics (Generic)
 import           Network.HTTP.Types.URI
 import           Network.Wai.Test
 
-import           Solga
+import           Solga.Core
+import           Solga.Router
 
 main :: IO ()
 main = hspec spec
