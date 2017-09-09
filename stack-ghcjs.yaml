@@ -1,0 +1,20 @@
+packages:
+- 'solga-core'
+- 'solga-client-ghcjs'
+- location:
+    git: git@github.com:bitonic/ghcjs-base.git
+    commit: e36e6be8a99a240c51319abd36827cc00e0c3cf2
+  extra-dep: true
+allow-newer: true
+flags: {}
+extra-package-dbs: []
+
+resolver: lts-8.11
+compiler: ghcjs-0.2.1.9008011_ghc-8.0.2
+compiler-check: match-exact
+setup-info:
+  ghcjs:
+    source:
+      ghcjs-0.2.1.9008011_ghc-8.0.2:
+        url: https://github.com/matchwood/ghcjs-stack-dist/raw/master/ghcjs-0.2.1.9008011.tar.gz
+        sha1: a72a5181124baf64bcd0e68a8726e65914473b3b
