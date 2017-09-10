@@ -113,22 +113,22 @@ newtype ReqBodyJSON a next = ReqBodyJSON { reqBodyJSONNext :: a -> next }
 newtype WithIO next = WithIO { withIONext :: IO next }
 
 type MultiPartParam = (ByteString, ByteString)
-type MultiPartFile y = (ByteString, MultiPartFileInfo y)
+type MultiPartFile = (ByteString, MultiPartFileInfo)
 
-data MultiPartFileInfo c = MultiPartFileInfo
+data MultiPartFileInfo = MultiPartFileInfo
   { mpfiName :: ByteString
   , mpfiContentType :: ByteString
   , mpfiContent :: FilePath
   }
 
 -- | A parsed "multipart/form-data" request.
-type MultiPartData y = ([MultiPartParam], [MultiPartFile y])
+type MultiPartData = ([MultiPartParam], [MultiPartFile])
 
 -- | Accept a "multipart/form-data" request.
 -- Files will be stored in a temporary directory and will be deleted
 -- automatically after the request is processed.
-data ReqBodyMultipart y a next = ReqBodyMultipart
-  { reqMultiPartParse :: MultiPartData y -> Either String a
+data ReqBodyMultipart a next = ReqBodyMultipart
+  { reqMultiPartParse :: MultiPartData -> Either String a
   , reqMultiPartNext :: a -> next
   }
 

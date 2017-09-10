@@ -131,7 +131,7 @@ instance (Client next, ToSegment a) => Client (Capture a next) where
     performRequest (Proxy @next) (addSegment req (toSegment x)) mgr perf
 
 instance (Client next, KnownSymbol method) => Client (Method method next) where
-  type RequestData (Method seg next) = RequestData next
+  type RequestData (Method method next) = RequestData next
   performRequest _p req mgr perf = performRequest
     (Proxy @next) req{Http.method = BSC8.pack (symbolVal (Proxy @method))} mgr perf
 
@@ -164,11 +164,12 @@ instance (Client next) => Client (WithIO next) where
   type RequestData (WithIO next) = RequestData next
   performRequest _p req mgr perf = performRequest (Proxy @next) req mgr perf
 
-instance (Client next) => Client (ReqBodyMultipart fp a next) where
+instance (Client next) => Client (ReqBodyMultipart a next) where
   type
-    RequestData (ReqBodyMultipart fp a next) =
-      WithData ([Http.Part], Maybe ByteString) (RequestData next)
-  performRequest _p req mgr (WithData (parts, mbBoundary) perf) = do
+    RequestData (ReqBodyMultipart a next) =
+      WithData (a, a -> ([Http.Part], Maybe ByteString)) (RequestData next)
+  performRequest _p req mgr (WithData (x, f) perf) = do
+    let (parts, mbBoundary) = f x
     req' <- case mbBoundary of
       Nothing -> Http.formDataBody parts req
       Just x -> Http.formDataBodyWithBoundary x parts req

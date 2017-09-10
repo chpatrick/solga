@@ -97,8 +97,6 @@ spec port = do
         Right seg' <- return decodeSeg
         return (seg == seg')
 
-deriving instance Generic Value
-
 instance Arbitrary Value where
   arbitrary = sized arbJSON
    where

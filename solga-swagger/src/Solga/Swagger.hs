@@ -136,7 +136,7 @@ instance RouterSwagger next => RouterSwagger (NoCache next) where
 instance RouterSwagger next => RouterSwagger (ExtraHeaders next) where
   genPaths = passPaths
 
-instance RouterSwagger (ReqBodyMultipart fp a next) where
+instance RouterSwagger (ReqBodyMultipart a next) where
   genPaths = noPaths
 
 instance RouterSwagger (OneOfSegs '[] next) where

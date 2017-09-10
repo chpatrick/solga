@@ -200,9 +200,9 @@ instance (Client next) => Client (WithIO next) where
   type RequestData (WithIO next) = RequestData next
   performRequest _p req perf = performRequest (Proxy @next) req perf
 
-instance (Client next) => Client (ReqBodyMultipart fp a next) where
+instance (Client next) => Client (ReqBodyMultipart a next) where
   type
-    RequestData (ReqBodyMultipart fp a next) =
-      WithData [(JSString, Xhr.FormDataVal)] (RequestData next)
-  performRequest _p req (WithData fd perf) = do
-    performRequest (Proxy @next) req{reqData = Xhr.FormData fd} perf
+    RequestData (ReqBodyMultipart a next) =
+      WithData (a, a -> [(JSString, Xhr.FormDataVal)]) (RequestData next)
+  performRequest _p req (WithData (x, f) perf) = do
+    performRequest (Proxy @next) req{reqData = Xhr.FormData (f x)} perf

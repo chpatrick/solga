@@ -172,7 +172,7 @@ instance (Aeson.FromJSON a, Router next) => Router (ReqBodyJSON a next) where
 instance Router next => Router (WithIO next) where
   tryRoute = tryRouteNextIO withIONext
 
-instance (fp ~ FilePath, Router next) => Router (ReqBodyMultipart fp a next) where
+instance (Router next) => Router (ReqBodyMultipart a next) where
   tryRoute req = flip fmap (tryRoute req) $ \nextRouter rmp cont ->
     runResourceT $ withInternalState $ \s -> do
       (params, fileInfos0) <- Wai.parseRequestBody (Wai.tempFileBackEnd s) req
@@ -186,7 +186,7 @@ instance (fp ~ FilePath, Router next) => Router (ReqBodyMultipart fp a next) whe
                   , mpfiContent = fileContent
                   }
               )
-      let multiPart :: MultiPartData FilePath = (params, fileInfos)
+      let multiPart :: MultiPartData = (params, fileInfos)
       case reqMultiPartParse rmp multiPart of
         Left err -> throwIO $ badRequest $ "Could not decode form request: " <> Text.pack err
         Right val -> nextRouter (reqMultiPartNext rmp val) cont
@@ -251,7 +251,7 @@ instance Abbreviated next => Abbreviated (WithIO next) where
   type Brief (WithIO next) = IO (Brief next)
   brief = WithIO . fmap brief
 
-instance Abbreviated (ReqBodyMultipart fp a next)
+instance Abbreviated (ReqBodyMultipart a next)
 
 -- Generic routers
 
