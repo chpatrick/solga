@@ -1,0 +1,52 @@
+name:                solga-client
+version:             0.1.0.0
+synopsis:            Simple typesafe web routing
+description:         A library for easily making requests to solga endpoints
+license:             MIT
+license-file:        LICENSE
+author:              Francesco Mazzoli
+maintainer:          f@mazzo.li
+copyright:           Copyright (C) 2017 Francesco Mazzoli
+category:            Web
+build-type:          Simple
+homepage:            https://github.com/chpatrick/solga
+bug-reports:         https://github.com/chpatrick/solga/issues
+-- extra-source-files:
+cabal-version:       >=1.10
+
+library
+  exposed-modules:     Solga.Client
+  build-depends:       base >= 4.8 && < 5,
+                       solga-core,
+                       aeson,
+                       http-client,
+                       bytestring,
+                       text,
+                       blaze-builder,
+                       http-types
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+
+test-suite solga-client-tests
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Test.hs
+  ghc-options:         -Wall
+  default-language:    Haskell2010
+  build-depends:       base
+                     , solga-core
+                     , solga-client
+                     , solga-router
+                     , text
+                     , wai
+                     , aeson
+                     , hspec
+                     , http-types
+                     , unordered-containers
+                     , hashable
+                     , vector
+                     , scientific
+                     , QuickCheck
+                     , http-client
+                     , warp

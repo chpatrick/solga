@@ -4,19 +4,16 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -ddump-deriv #-}
 
 module Main (main) where
 
 import           Test.Hspec
-import           Test.Hspec.Wai
-import           Test.Hspec.Wai.JSON
-import           Test.Hspec.Wai.QuickCheck
-import           Test.QuickCheck (genericShrink)
+import           Test.QuickCheck (genericShrink, property, ioProperty, Arbitrary(..), Gen, sized, oneof, scale, listOf)
 
 import           Data.Aeson hiding (json)
-import qualified Data.ByteString.Lazy as LBS
-import qualified Data.ByteString.Builder as BSB
 import           Data.Hashable
 import qualified Data.Scientific as S
 import qualified Data.Text as T
@@ -24,13 +21,18 @@ import qualified Data.HashMap.Strict as HMS
 import qualified Data.Vector as V
 import           Data.Traversable
 import           GHC.Generics (Generic)
-import           Network.HTTP.Types.URI
-import           Network.Wai.Test
+import           Network.HTTP.Types
+import qualified Network.HTTP.Client as Http
+import           Data.Proxy (Proxy(..))
+import qualified Network.Wai.Handler.Warp as Warp
 
-import           Solga
+import           Solga.Core
+import           Solga.Router
+import           Solga.Client
 
 main :: IO ()
-main = hspec spec
+main = do
+  Warp.withApplication (return (serve testAPI)) (hspec . spec)
 
 data TestAPI = TestAPI
   { basic :: "basic" /> Get T.Text
@@ -39,6 +41,7 @@ data TestAPI = TestAPI
   , echoCapture :: "echo-capture" /> Capture T.Text :> Get T.Text
   } deriving (Generic)
 instance Router TestAPI
+instance Client TestAPI
 
 testAPI :: TestAPI
 testAPI = TestAPI
@@ -48,50 +51,51 @@ testAPI = TestAPI
   , echoCapture = brief return
   }
 
-spec :: Spec
-spec = with (return $ serve testAPI) $ do
+req :: Warp.Port -> RequestData TestAPI a -> IO a
+req p x = do
+  mgr <- Http.newManager Http.defaultManagerSettings
+  performRequest (Proxy @TestAPI) Http.defaultRequest{Http.port = p} mgr x
+
+spec :: Warp.Port -> Spec
+spec port = do
   -- tests basic routing
   describe "GET /basic" $ do
     it "responds with 200" $ do
-      get "/basic" `shouldRespondWith` 200
-
-    it "responds with 404 for the wrong method" $ do
-      post "/basic" "" `shouldRespondWith` 404
+      req port $ choose basic $ GetResponse $ \resp _txt ->
+        Http.responseStatus resp `shouldBe` status200
 
     it "responds with \"basic\"" $ do
-      get "/basic" `shouldRespondWith` [json|"basic"|]
-
-  describe "GET /doesnt-exist" $
-    it "responds with 404" $ do
-      get "/doesnt-exist" `shouldRespondWith` 404
+      req port $ choose basic $ GetResponse $ \_resp decodeTxt -> do
+        Right txt <- return decodeTxt
+        txt `shouldBe` "basic"
 
   -- tests ReqBodyJSON and JSON
   describe "POST /echo-json" $ do
     it "responds with 200" $
-      post "/echo-json" [json|"test"|] `shouldRespondWith` 200
-
-    it "responds with correct content type" $
-      post "/echo-json" [json|"test"|] `shouldRespondWith`
-        200 { matchHeaders = ["Content-Type" <:> "application/json"] }
+      req port $ choose echoJSON $ WithData (String "test") $ GetResponse $ \resp _txt ->
+        Http.responseStatus resp `shouldBe` status200
 
     it "responds with same JSON" $ property $ \val -> do
-      resp <- post "/echo-json" (encode val)
-      liftIO $ decode (simpleBody resp) `shouldBe` Just (val :: Value)
+      ioProperty $ req port $ choose echoJSON $ WithData val $ GetResponse $ \_resp decodeVal -> do
+        Right val' <- return decodeVal
+        return (val == val')
 
   -- tests exception handling
   describe "GET /fubar" $ do
     it "responds with 500" $
-      get "/fubar" `shouldRespondWith` 500
+      req port $ choose internalError $ GetResponse $ \resp _ ->
+        Http.responseStatus resp `shouldBe` status500
 
   -- tests Capture
   describe "GET /echo-capture" $ do
     it "responds with 200" $
-      get "/echo-capture/test" `shouldRespondWith` 200
+      req port $ choose echoCapture $ WithData "test" $ GetResponse $ \resp _ ->
+        Http.responseStatus resp `shouldBe` status200
 
     it "responds with captured segment" $ property $ \seg -> do
-      let path = LBS.toStrict $ BSB.toLazyByteString $ encodePathSegments [ "echo-capture", seg ]
-      resp <- get path
-      liftIO $ decode (simpleBody resp) `shouldBe` Just (String seg)
+      ioProperty $ req port $ choose echoCapture $ WithData seg $ GetResponse $ \_ decodeSeg -> do
+        Right seg' <- return decodeSeg
+        return (seg == seg')
 
 deriving instance Generic Value
 
