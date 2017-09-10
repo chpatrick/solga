@@ -17,7 +17,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:     Solga.Swagger
   build-depends:       base >= 4.8 && < 5,
-                       solga,
+                       solga-core,
                        swagger2 >= 2.1,
                        lens,
                        text,

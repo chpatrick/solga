@@ -27,7 +27,8 @@ import           GHC.Generics (Generic)
 import           Network.HTTP.Types.URI
 import           Network.Wai.Test
 
-import           Solga
+import           Solga.Core
+import           Solga.Router
 
 main :: IO ()
 main = hspec spec
@@ -93,7 +94,6 @@ spec = with (return $ serve testAPI) $ do
       resp <- get path
       liftIO $ decode (simpleBody resp) `shouldBe` Just (String seg)
 
-deriving instance Generic Value
 
 instance Arbitrary Value where
   arbitrary = sized arbJSON

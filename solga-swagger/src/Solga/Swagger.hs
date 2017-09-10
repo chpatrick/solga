@@ -41,7 +41,7 @@ import           GHC.TypeLits
 import           Data.Swagger as Swagger
 import           Data.Swagger.Declare
 
-import           Solga
+import           Solga.Core
 
 data Context = Context
   { contextMethod :: Maybe HTTP.Method -- ^ Any method currently set.
@@ -106,7 +106,7 @@ pathsFromContext response ctx@Context { contextMethod, pathSegments, operationCo
   let pathItem = mempty & methodSetter ?~ operation
   return $ OHMS.singleton path pathItem
 
-instance RouterSwagger RawResponse where
+instance RouterSwagger (RawResponse a) where
   genPaths _ = pathsFromContext mempty
 
 instance ToSchema a => RouterSwagger (JSON a) where
@@ -136,7 +136,7 @@ instance RouterSwagger next => RouterSwagger (NoCache next) where
 instance RouterSwagger next => RouterSwagger (ExtraHeaders next) where
   genPaths = passPaths
 
-instance RouterSwagger (ReqBodyMultipart a next) where
+instance RouterSwagger (ReqBodyMultipart fp a next) where
   genPaths = noPaths
 
 instance RouterSwagger (OneOfSegs '[] next) where
@@ -149,7 +149,7 @@ instance (KnownSymbol seg, RouterSwagger next, RouterSwagger (OneOfSegs segs nex
     nextSegPaths <- genPaths (Proxy :: Proxy (OneOfSegs segs next)) ctx
     return (nextPaths `OHMS.union` nextSegPaths)
 
-instance RouterSwagger Raw where
+instance RouterSwagger (Raw a) where
   genPaths = noPaths
 
 instance (RouterSwagger left, RouterSwagger right) => RouterSwagger (left :<|> right) where

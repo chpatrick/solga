@@ -1,0 +1,56 @@
+name:                solga-router
+version:             0.1.0.0
+synopsis:            Simple typesafe web routing
+description:         A library for easily specifying web APIs and implementing them in a type-safe way.
+license:             MIT
+license-file:        LICENSE
+author:              Patrick Chilton
+maintainer:          chpatrick@gmail.com
+copyright:           Copyright (C) 2016 Patrick Chilton
+category:            Web
+build-type:          Simple
+homepage:            https://github.com/chpatrick/solga
+bug-reports:         https://github.com/chpatrick/solga/issues
+-- extra-source-files:
+cabal-version:       >=1.10
+
+library
+  exposed-modules:     Solga.Router
+  build-depends:       base >= 4.8 && < 5,
+                       solga-core,
+                       text,
+                       wai,
+                       bytestring,
+                       containers,
+                       aeson >= 1.0.0.0,
+                       wai-extra,
+                       http-types,
+                       resourcet,
+                       safe-exceptions
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+
+test-suite solga-router-tests
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Test.hs
+  ghc-options:         -Wall
+  default-language:    Haskell2010
+  build-depends:       base
+                     , solga-router
+                     , solga-core
+                     , text
+                     , bytestring
+                     , wai
+                     , wai-extra
+                     , aeson
+                     , hspec
+                     , hspec-wai
+                     , hspec-wai-json
+                     , http-types
+                     , unordered-containers
+                     , hashable
+                     , vector
+                     , scientific
+                     , QuickCheck
