@@ -21,7 +21,10 @@ module Solga.Router
   -- * Error handling
   , SolgaError
   , badRequest
+  , unauthorized
+  , forbidden
   , notFound
+  , internalServerError
   -- * Router implementation
   , FromSegment(..)
   , Router(..)
@@ -281,9 +284,30 @@ badRequest msg = SolgaError
   , errorMessage = msg
   }
 
+-- | Create a @401 Unauthorized@ error with a given message.
+unauthorized :: Text.Text -> SolgaError
+unauthorized msg = SolgaError
+  { errorStatus = HTTP.unauthorized401
+  , errorMessage = msg
+  }
+
+-- | Create a @403 Forbidden@ error with a given message.
+forbidden :: Text.Text -> SolgaError
+forbidden msg = SolgaError
+  { errorStatus = HTTP.forbidden403
+  , errorMessage = msg
+  }
+
 -- | Create a @404 Not Found@ error with a given message.
 notFound :: Text.Text -> SolgaError
 notFound msg = SolgaError
   { errorStatus = HTTP.notFound404
+  , errorMessage = msg
+  }
+
+-- | Create a @500 Internal Server Error@ error with a given message.
+internalServerError :: Text.Text -> SolgaError
+internalServerError msg = SolgaError
+  { errorStatus = HTTP.internalServerError500
   , errorMessage = msg
   }

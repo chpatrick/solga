@@ -94,7 +94,6 @@ spec = with (return $ serve testAPI) $ do
       resp <- get path
       liftIO $ decode (simpleBody resp) `shouldBe` Just (String seg)
 
-
 instance Arbitrary Value where
   arbitrary = sized arbJSON
    where
