@@ -27,6 +27,8 @@ module Solga.Client.GHCJS
   , WithData(..)
   , GetResponse(..)
   , JSONResponse(..)
+  , Request(..)
+  , Header
   ) where
 
 import Data.Kind
@@ -211,3 +213,4 @@ instance (Client next) => Client (ReqBodyMultipart a next) where
       WithData (a, a -> [(JSString, Xhr.FormDataVal)]) (RequestData next)
   performRequest _p req (WithData (x, f) perf) = do
     performRequest (Proxy @next) req{reqData = Xhr.FormData (f x)} perf
+
