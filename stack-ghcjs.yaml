@@ -2,8 +2,8 @@ packages:
 - 'solga-core'
 - 'solga-client-ghcjs'
 - location:
-    git: git@github.com:bitonic/ghcjs-base.git
-    commit: e36e6be8a99a240c51319abd36827cc00e0c3cf2
+    git: https://github.com/bitonic/jsval-json.git
+    commit: 5e24033a30afd832ed064be5c51621cf433baada
   extra-dep: true
 allow-newer: true
 flags: {}

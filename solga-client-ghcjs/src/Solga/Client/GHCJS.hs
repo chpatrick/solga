@@ -18,8 +18,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE JavaScriptFFI #-}
 {-# LANGUAGE RecordWildCards #-}
-module Solga.Client.GHCJS where
-  {-
+module Solga.Client.GHCJS
   ( Client(..)
   , SomeRequestData(..)
   , choose
@@ -27,8 +26,8 @@ module Solga.Client.GHCJS where
   , ToSegment(..)
   , WithData(..)
   , GetResponse(..)
+  , JSONResponse(..)
   ) where
-  -}
 
 import Data.Kind
 import Data.Proxy
@@ -43,9 +42,8 @@ import Data.Typeable (Typeable)
 import qualified Data.DList as DList
 import Data.DList (DList)
 import Data.String (fromString)
-import qualified JavaScript.JSON.Types.Class as Json
-import qualified JavaScript.JSON.Types.Internal as Json
-import GHCJS.Types (Immutable)
+import qualified JavaScript.JSValJSON as Json
+import Data.Traversable (for)
 
 import Solga.Core hiding (Header)
 
@@ -172,16 +170,21 @@ instance (Client next, KnownSymbol method) => Client (Method method next) where
 
 newtype GetResponse resp a b = GetResponse {unGetResponse :: Xhr.Response resp -> a -> IO b}
 
+newtype JSONResponse = JSONResponse {unJSONResponse :: Json.Value}
+
+instance Xhr.ResponseType JSONResponse where
+  getResponseTypeString _ = "json"
+  wrapResponseType = JSONResponse
+
 instance (Json.FromJSON a) => Client (JSON a) where
   -- note that we do not decode eagerly because it's often the case that the body
   -- cannot be decoded since web servers return invalid json on errors
   -- (e.g. "Internal server error" on a 500 rather than a json encoded error)
-  type RequestData (JSON a) = GetResponse (Json.SomeValue Immutable) (Maybe (Either String a))
+  type RequestData (JSON a) = GetResponse JSONResponse (IO (Maybe (Either String a)))
   performRequest _p req (GetResponse f) = do
     resp <- Xhr.xhr =<< toXhrRequest req
-    f resp $ do
-      data_ <- Xhr.contents resp
-      return (Json.parseEither Json.parseJSON data_)
+    f resp $ for (Xhr.contents resp) $ \(JSONResponse data_) ->
+      Json.runParser Json.parseJSON data_
 
 instance (Client next) => Client (ExtraHeaders next) where
   type RequestData (ExtraHeaders next) = RequestData next
@@ -193,8 +196,10 @@ instance (Client next) => Client (NoCache next) where
 
 instance (Client next, Json.ToJSON a) => Client (ReqBodyJSON a next) where
   type RequestData (ReqBodyJSON a next) = WithData a (RequestData next)
-  performRequest _p req (WithData x perf) = performRequest
-    (Proxy @next) req{reqData = Xhr.StringData (Json.encode (Json.toJSON x))} perf
+  performRequest _p req (WithData x perf) = do
+    s <- Json.toJSONString =<< Json.toJSON x
+    performRequest
+      (Proxy @next) req{reqData = Xhr.StringData s} perf
 
 instance (Client next) => Client (WithIO next) where
   type RequestData (WithIO next) = RequestData next
