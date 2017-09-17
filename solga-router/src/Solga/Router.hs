@@ -26,7 +26,6 @@ module Solga.Router
   , notFound
   , internalServerError
   -- * Router implementation
-  , FromSegment(..)
   , Router(..)
   , Responder
   , tryRouteNext
@@ -125,13 +124,6 @@ instance (KnownSymbol seg, Router next, Router (OneOfSegs segs next)) => Router 
 
 instance Router next => Router (OneOfSegs '[] next) where
   tryRoute _ = Nothing
-
--- | The class of types that can be parsed from a path segment.
-class FromSegment a where
-  fromSegment :: Text.Text -> Maybe a
-
-instance FromSegment Text.Text where
-  fromSegment = Just
 
 instance (FromSegment a, Router next) => Router (Capture a next) where
   tryRoute req = case Wai.pathInfo req of

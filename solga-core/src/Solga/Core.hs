@@ -39,11 +39,14 @@ module Solga.Core
   , ReqBodyMultipart(..)
   , Endpoint
   , (:<|>)(..)
+  -- * FromSegment
+  , FromSegment(..)
   ) where
 
 import           GHC.TypeLits
 import           Data.ByteString (ByteString)
 import           Data.CaseInsensitive (CI)
+import qualified Data.Text as T
 
 ---------------------------------------------------
 
@@ -139,4 +142,11 @@ type Endpoint method a = End :> NoCache :> Method method :> WithIO :> a
 type Get a = Endpoint "GET" (JSON a)
 -- | Handle a "POST" request and produce a "JSON" response, with `IO`.
 type Post a = Endpoint "POST" (JSON a)
+
+-- | The class of types that can be parsed from a path segment.
+class FromSegment a where
+  fromSegment :: T.Text -> Maybe a
+
+instance FromSegment T.Text where
+  fromSegment = Just
 
