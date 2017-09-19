@@ -12,6 +12,7 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE CPP #-}
 module Solga.Core
   ( -- * Path components
     type (:>), type (/>)
@@ -47,6 +48,11 @@ import           GHC.TypeLits
 import           Data.ByteString (ByteString)
 import           Data.CaseInsensitive (CI)
 import qualified Data.Text as T
+
+#if defined(ghcjs_HOST_OS)
+import Data.JSString (JSString)
+import Data.JSString.Text (textToJSString)
+#endif
 
 ---------------------------------------------------
 
@@ -150,3 +156,7 @@ class FromSegment a where
 instance FromSegment T.Text where
   fromSegment = Just
 
+#if defined(ghcjs_HOST_OS)
+instance FromSegment JSString where
+  fromSegment = Just . textToJSString
+#endif
