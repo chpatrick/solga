@@ -18,6 +18,11 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE JavaScriptFFI #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE NamedFieldPuns #-}
 module Solga.Client.GHCJS
   ( Client(..)
   , SomeRequestData(..)
@@ -26,8 +31,8 @@ module Solga.Client.GHCJS
   , ToSegment(..)
   , WithData(..)
   , GetResponse(..)
-  , JSONResponse(..)
   , Request(..)
+  , Response(..)
   , Header
   ) where
 
@@ -36,59 +41,40 @@ import Data.Proxy
 import GHC.Generics
 import GHC.TypeLits (symbolVal, KnownSymbol, Symbol)
 import Data.Monoid ((<>))
-import qualified JavaScript.Web.XMLHttpRequest as Xhr
-import Control.Exception (Exception, throwIO)
 import qualified Data.JSString as JSS
 import Data.JSString (JSString)
-import Data.Typeable (Typeable)
 import qualified Data.DList as DList
 import Data.DList (DList)
 import Data.String (fromString)
 import qualified JavaScript.JSValJSON as Json
-import Data.Traversable (for)
+import qualified GHCJS.DOM.XMLHttpRequest as DOM
+import qualified GHCJS.DOM.Types as DOM
+import qualified GHCJS.DOM.Enums as DOM
+import Data.Foldable (for_)
 
 import Solga.Core hiding (Header)
 
-data SomeRequestData out a = forall in_. (Client in_) => SomeRequestData (Proxy in_) (RequestData in_ a)
-
 type Header = (JSString, JSString)
 
-data Request = Request
-  { reqMethod :: String
+data Request = forall body. (DOM.IsXMLHttpRequestBody body) => Request
+  { reqMethod :: JSString
   , reqHost :: JSString
   , reqSegments :: DList JSString
   , reqQueryString :: JSString
-  , reqData :: Xhr.RequestData
-  , reqLogin :: Maybe (JSString, JSString)
+  , reqUser :: Maybe JSString
+  , reqPassword :: Maybe JSString
   , reqHeaders :: [Header]
-  , reqWithCredentials :: Bool
+  , reqBody :: Maybe body
+  , reqXHR :: DOM.XMLHttpRequest
+  -- ^ will be used to send the request, useful if you want to set
+  -- events on it (e.g. onprogress)
   }
 
-newtype BadMethod = BadMethod String
-  deriving (Eq, Show, Typeable)
-instance Exception BadMethod
+data SomeRequestData out a = forall in_. (Client in_) => SomeRequestData (Proxy in_) (RequestData in_ a)
 
 foreign import javascript unsafe
   "encodeURI($1)"
   js_encodeURI :: JSString -> IO JSString
-
-toXhrRequest :: Request -> IO Xhr.Request
-toXhrRequest Request{..} = do
-  meth <- case reqMethod of
-    "GET" -> return Xhr.GET
-    "POST" -> return Xhr.POST
-    "PUT" -> return Xhr.PUT
-    "DELETE" -> return Xhr.DELETE
-    x -> throwIO (BadMethod x)
-  uri <- js_encodeURI (reqHost <> "/" <> JSS.intercalate "/" (DList.toList reqSegments) <> reqQueryString)
-  return Xhr.Request
-    { Xhr.reqMethod = meth
-    , Xhr.reqURI = uri
-    , Xhr.reqLogin = reqLogin
-    , Xhr.reqHeaders = reqHeaders
-    , Xhr.reqWithCredentials = reqWithCredentials
-    , Xhr.reqData = reqData
-    }
 
 class Client r where
   type RequestData r :: * -> *
@@ -156,8 +142,8 @@ instance ToSegment JSString where
   toSegment = id
 
 data WithData a next b = WithData
-  { ardData :: a
-  , ardNext :: next b
+  { wdData :: a
+  , wdNext :: next b
   }
 
 instance (Client next, ToSegment a) => Client (Capture a next) where
@@ -168,25 +154,53 @@ instance (Client next, ToSegment a) => Client (Capture a next) where
 instance (Client next, KnownSymbol method) => Client (Method method next) where
   type RequestData (Method seg next) = RequestData next
   performRequest _p req perf = performRequest
-    (Proxy @next) req{reqMethod = symbolVal (Proxy @method)} perf
+    (Proxy @next) req{reqMethod = JSS.pack (symbolVal (Proxy @method))} perf
 
-newtype GetResponse resp a b = GetResponse {unGetResponse :: Xhr.Response resp -> a -> IO b}
+data Response a = Response
+  { responseStatus :: Word
+  , responseBody :: a
+  } deriving (Functor, Foldable, Traversable)
 
-newtype JSONResponse = JSONResponse {unJSONResponse :: Json.Value}
+data XHRError =
+    XHRAborted
+  | XHRError
 
-instance Xhr.ResponseType JSONResponse where
-  getResponseTypeString _ = "json"
-  wrapResponseType = JSONResponse
+newtype GetResponse a b = GetResponse {unGetResponse :: Either XHRError (Response a) -> IO b}
+
+foreign import javascript interruptible
+  "h$anapoSendXHR($1, null, $c);"
+  js_send0 :: DOM.XMLHttpRequest -> IO Int
+foreign import javascript interruptible
+  "h$anapoSendXHR($1, $2, $c);"
+  js_send1 ::  DOM.XMLHttpRequest -> DOM.JSVal ->IO Int
+
+performXHR :: DOM.XMLHttpRequestResponseType -> Request -> IO (Either XHRError (Response DOM.JSVal))
+performXHR respType Request{..} = do
+  let xhr = reqXHR
+  DOM.setResponseType xhr respType
+  uri <- js_encodeURI (reqHost <> JSS.intercalate "/" (DList.toList reqSegments) <> reqQueryString)
+  DOM.open xhr reqMethod uri False reqUser reqPassword
+  for_ reqHeaders (uncurry (DOM.setRequestHeader xhr))
+  r <- case reqBody of
+    Nothing -> js_send0 xhr
+    Just body -> js_send1 xhr =<< DOM.toJSVal body
+  case r of
+    0 -> fmap Right $ do
+      status <- DOM.getStatus xhr
+      resp <- DOM.getResponse xhr
+      return (Response status resp)
+    1 -> return (Left XHRAborted)
+    2 -> return (Left XHRError)
+    _ -> error ("performXHR: bad return value " <> show r)
 
 instance (Json.FromJSON a) => Client (JSON a) where
   -- note that we do not decode eagerly because it's often the case that the body
   -- cannot be decoded since web servers return invalid json on errors
   -- (e.g. "Internal server error" on a 500 rather than a json encoded error)
-  type RequestData (JSON a) = GetResponse JSONResponse (IO (Maybe (Either String a)))
+  type RequestData (JSON a) = GetResponse (IO (Either String a))
   performRequest _p req (GetResponse f) = do
-    resp <- Xhr.xhr =<< toXhrRequest req
-    f resp $ for (Xhr.contents resp) $ \(JSONResponse data_) ->
-      Json.runParser Json.parseJSON data_
+    resp <- performXHR DOM.XMLHttpRequestResponseTypeJson req
+    f (fmap (fmap (Json.runParser Json.parseJSON)) resp)
 
 instance (Client next) => Client (ExtraHeaders next) where
   type RequestData (ExtraHeaders next) = RequestData next
@@ -198,10 +212,10 @@ instance (Client next) => Client (NoCache next) where
 
 instance (Client next, Json.ToJSON a) => Client (ReqBodyJSON a next) where
   type RequestData (ReqBodyJSON a next) = WithData a (RequestData next)
-  performRequest _p req (WithData x perf) = do
+  performRequest _p Request{..} (WithData x perf) = do
     s <- Json.toJSONString =<< Json.toJSON x
     performRequest
-      (Proxy @next) req{reqData = Xhr.StringData s} perf
+      (Proxy @next) Request{reqBody = Just s, ..} perf
 
 instance (Client next) => Client (WithIO next) where
   type RequestData (WithIO next) = RequestData next
@@ -210,7 +224,7 @@ instance (Client next) => Client (WithIO next) where
 instance (Client next) => Client (ReqBodyMultipart a next) where
   type
     RequestData (ReqBodyMultipart a next) =
-      WithData (a, a -> [(JSString, Xhr.FormDataVal)]) (RequestData next)
-  performRequest _p req (WithData (x, f) perf) = do
-    performRequest (Proxy @next) req{reqData = Xhr.FormData (f x)} perf
-
+      WithData (a, a -> IO DOM.FormData) (RequestData next)
+  performRequest _p Request{..} (WithData (x, f) perf) = do
+    fd <- f x
+    performRequest (Proxy @next) Request{reqBody = Just fd, ..} perf
