@@ -180,7 +180,7 @@ performXHR :: DOM.XMLHttpRequestResponseType -> Request -> IO (Either XHRError (
 performXHR respType Request{..} = do
   let xhr = reqXHR
   DOM.setResponseType xhr respType
-  uri <- js_encodeURI (reqHost <> JSS.intercalate "/" (DList.toList reqSegments) <> reqQueryString)
+  uri <- js_encodeURI (reqHost <> "/" <> JSS.intercalate "/" (DList.toList reqSegments) <> reqQueryString)
   DOM.open xhr reqMethod uri True reqUser reqPassword
   for_ reqHeaders (uncurry (DOM.setRequestHeader xhr))
   r <- case reqBody of
