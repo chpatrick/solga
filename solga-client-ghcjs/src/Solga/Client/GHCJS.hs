@@ -34,6 +34,7 @@ module Solga.Client.GHCJS
   , Request(..)
   , Response(..)
   , Header
+  , XHRError(..)
   ) where
 
 import Data.Kind
