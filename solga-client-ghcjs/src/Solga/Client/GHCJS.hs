@@ -165,6 +165,7 @@ data Response a = Response
 data XHRError =
     XHRAborted
   | XHRError
+  deriving (Eq, Show)
 
 newtype GetResponse a b = GetResponse {unGetResponse :: Either XHRError (Response a) -> IO b}
 
