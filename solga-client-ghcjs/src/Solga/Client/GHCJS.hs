@@ -170,10 +170,10 @@ data XHRError =
 newtype GetResponse a b = GetResponse {unGetResponse :: Either XHRError (Response a) -> IO b}
 
 foreign import javascript interruptible
-  "h$anapoSendXHR($1, null, $c);"
+  "h$solgaSendXHR($1, null, $c);"
   js_send0 :: DOM.XMLHttpRequest -> IO Int
 foreign import javascript interruptible
-  "h$anapoSendXHR($1, $2, $c);"
+  "h$solgaSendXHR($1, $2, $c);"
   js_send1 ::  DOM.XMLHttpRequest -> DOM.JSVal ->IO Int
 
 performXHR :: DOM.XMLHttpRequestResponseType -> Request -> IO (Either XHRError (Response DOM.JSVal))
