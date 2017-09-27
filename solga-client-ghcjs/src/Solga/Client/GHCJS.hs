@@ -226,7 +226,6 @@ instance (Client next) => Client (WithIO next) where
 instance (Client next) => Client (ReqBodyMultipart a next) where
   type
     RequestData (ReqBodyMultipart a next) =
-      WithData (a, a -> IO DOM.FormData) (RequestData next)
-  performRequest _p Request{..} (WithData (x, f) perf) = do
-    fd <- f x
+      WithData DOM.FormData (RequestData next)
+  performRequest _p Request{..} (WithData fd perf) =
     performRequest (Proxy @next) Request{reqBody = Just fd, ..} perf
