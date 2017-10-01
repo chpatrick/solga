@@ -23,6 +23,7 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE CPP #-}
 module Solga.Client.GHCJS
   ( Client(..)
   , SomeRequestData(..)
@@ -42,28 +43,48 @@ import Data.Proxy
 import GHC.Generics
 import GHC.TypeLits (symbolVal, KnownSymbol, Symbol)
 import Data.Monoid ((<>))
-import qualified Data.JSString as JSS
-import Data.JSString (JSString)
 import qualified Data.DList as DList
 import Data.DList (DList)
 import Data.String (fromString)
-import qualified JavaScript.JSValJSON as Json
 import qualified GHCJS.DOM.XMLHttpRequest as DOM
 import qualified GHCJS.DOM.Types as DOM
 import qualified GHCJS.DOM.Enums as DOM
 import Data.Foldable (for_)
+import Control.Monad.IO.Class (liftIO)
 
 import Solga.Core hiding (Header)
 
-type Header = (JSString, JSString)
+#if defined(ghcjs_HOST_OS)
+import qualified JavaScript.JSValJSON as Json
+import Data.JSString (JSString)
+import qualified Data.JSString as T
+type Text = JSString
+#else
+import qualified Data.Aeson as Json
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Network.URI.Encode as Uri
+import qualified Data.ByteString.Lazy as BSL
+import qualified Language.Javascript.JSaddle as JSaddle
+import Control.Concurrent.MVar (takeMVar, tryPutMVar, MVar, newEmptyMVar)
+import qualified GHCJS.DOM.EventM as DOM.Event
+import qualified GHCJS.DOM.XMLHttpRequestEventTarget as DOM.Event
+import qualified JSDOM.Generated.XMLHttpRequest as DOM.XMLHttpRequest
+import Control.Monad.Catch (bracket)
+import Control.Monad (void)
+import Control.Monad.Trans.Class (lift)
+#endif
+
+type Header = (Text, Text)
 
 data Request = forall body. (DOM.IsXMLHttpRequestBody body) => Request
-  { reqMethod :: JSString
-  , reqHost :: JSString
-  , reqSegments :: DList JSString
-  , reqQueryString :: JSString
-  , reqUser :: Maybe JSString
-  , reqPassword :: Maybe JSString
+  { reqMethod :: Text
+  , reqHost :: Text
+  , reqSegments :: DList Text
+  , reqQueryString :: Text
+  , reqUser :: Maybe Text
+  , reqPassword :: Maybe Text
   , reqHeaders :: [Header]
   , reqBody :: Maybe body
   , reqXHR :: DOM.XMLHttpRequest
@@ -73,18 +94,14 @@ data Request = forall body. (DOM.IsXMLHttpRequestBody body) => Request
 
 data SomeRequestData out a = forall in_. (Client in_) => SomeRequestData (Proxy in_) (RequestData in_ a)
 
-foreign import javascript unsafe
-  "encodeURI($1)"
-  js_encodeURI :: JSString -> IO JSString
-
 class Client r where
   type RequestData r :: * -> *
   type RequestData r = SomeRequestData r
-  performRequest :: proxy r -> Request -> RequestData r a -> IO a
+  performRequest :: proxy r -> Request -> RequestData r a -> DOM.JSM a
   default
     performRequest :: forall (proxy :: * -> *) a.
          (RequestData r ~ SomeRequestData r)
-      => proxy r -> Request -> RequestData r a -> IO a
+      => proxy r -> Request -> RequestData r a -> DOM.JSM a
   performRequest _p req (SomeRequestData p perf) = performRequest p req perf
 
 choose :: forall in_ out a.
@@ -92,7 +109,7 @@ choose :: forall in_ out a.
   => (out -> in_) -> RequestData in_ a -> RequestData out a
 choose _f perf = SomeRequestData (Proxy @in_) perf
 
-newtype RawRequest a = RawRequest {unRequestDataRaw :: Request -> IO a}
+newtype RawRequest a = RawRequest {unRequestDataRaw :: Request -> DOM.JSM a}
 
 instance Client (Raw a) where
   type RequestData (Raw a) = RawRequest
@@ -106,7 +123,7 @@ instance (Client next) => Client (End next) where
   type RequestData (End next) = RequestData next
   performRequest _p req perf = performRequest (Proxy @next) req perf
 
-addSegment :: Request -> JSString -> Request
+addSegment :: Request -> Text -> Request
 addSegment req seg = req{reqSegments = reqSegments req <> DList.singleton seg}
 
 instance (Client next, KnownSymbol seg) => Client (Seg seg next) where
@@ -137,9 +154,9 @@ instance (Client next) => Client (OneOfSegs segs next) where
     performRequest (Proxy @next) (addSegment req (fromString (whichSeg ws))) perf
 
 class ToSegment a where
-  toSegment :: a -> JSString
+  toSegment :: a -> Text
 
-instance ToSegment JSString where
+instance ToSegment Text where
   toSegment = id
 
 data WithData a next b = WithData
@@ -155,7 +172,7 @@ instance (Client next, ToSegment a) => Client (Capture a next) where
 instance (Client next, KnownSymbol method) => Client (Method method next) where
   type RequestData (Method seg next) = RequestData next
   performRequest _p req perf = performRequest
-    (Proxy @next) req{reqMethod = JSS.pack (symbolVal (Proxy @method))} perf
+    (Proxy @next) req{reqMethod = T.pack (symbolVal (Proxy @method))} perf
 
 data Response a = Response
   { responseStatus :: Word
@@ -167,20 +184,25 @@ data XHRError =
   | XHRError
   deriving (Eq, Show)
 
-newtype GetResponse a b = GetResponse {unGetResponse :: Either XHRError (Response a) -> IO b}
+newtype GetResponse a b = GetResponse {unGetResponse :: Either XHRError (Response a) -> DOM.JSM b}
 
+#if defined(ghcjs_HOST_OS)
 foreign import javascript interruptible
   "h$solgaSendXHR($1, null, $c);"
   js_send0 :: DOM.XMLHttpRequest -> IO Int
 foreign import javascript interruptible
   "h$solgaSendXHR($1, $2, $c);"
-  js_send1 ::  DOM.XMLHttpRequest -> DOM.JSVal ->IO Int
+  js_send1 :: DOM.XMLHttpRequest -> DOM.JSVal -> IO Int
 
-performXHR :: DOM.XMLHttpRequestResponseType -> Request -> IO (Either XHRError (Response DOM.JSVal))
+foreign import javascript unsafe
+  "encodeURI($1)"
+  js_encodeURI :: Text -> IO Text
+
+performXHR :: DOM.XMLHttpRequestResponseType -> Request -> DOM.JSM (Either XHRError (Response DOM.JSVal))
 performXHR respType Request{..} = do
   let xhr = reqXHR
   DOM.setResponseType xhr respType
-  uri <- js_encodeURI (reqHost <> "/" <> JSS.intercalate "/" (DList.toList reqSegments) <> reqQueryString)
+  uri <- liftIO (js_encodeURI (reqHost <> "/" <> T.intercalate "/" (DList.toList reqSegments) <> reqQueryString))
   DOM.open xhr reqMethod uri True reqUser reqPassword
   for_ reqHeaders (uncurry (DOM.setRequestHeader xhr))
   r <- case reqBody of
@@ -204,6 +226,58 @@ instance (Json.FromJSON a) => Client (JSON a) where
     resp <- performXHR DOM.XMLHttpRequestResponseTypeJson req
     f (fmap (fmap (Json.runParser Json.parseJSON)) resp)
 
+instance (Client next, Json.ToJSON a) => Client (ReqBodyJSON a next) where
+  type RequestData (ReqBodyJSON a next) = WithData a (RequestData next)
+  performRequest _p Request{..} (WithData x perf) = do
+    s <- Json.toJSONString =<< Json.toJSON x
+    performRequest
+      (Proxy @next) Request{reqBody = Just s, ..} perf
+
+#else
+
+performXHR :: DOM.XMLHttpRequestResponseType -> Request -> DOM.JSM (Either XHRError (Response Text))
+performXHR respType Request{..} = do
+  let xhr = reqXHR
+  DOM.setResponseType xhr respType
+  let uri = Uri.encodeText (reqHost <> "/" <> T.intercalate "/" (DList.toList reqSegments) <> reqQueryString)
+  DOM.open xhr reqMethod uri True reqUser reqPassword
+  for_ reqHeaders (uncurry (DOM.setRequestHeader xhr))
+  result :: MVar (Either XHRError (Response Text)) <- liftIO newEmptyMVar
+  let onLoad = lift $ do
+        status <- DOM.getStatus xhr
+        resp <- DOM.getResponseTextUnchecked xhr
+        void (liftIO (tryPutMVar result (Right (Response status resp))))
+  bracket
+    (DOM.Event.on xhr DOM.Event.error (liftIO (void (tryPutMVar result (Left XHRError)))))
+    id
+    (\_ -> bracket
+      (DOM.Event.on xhr DOM.Event.abortEvent (liftIO (void (tryPutMVar result (Left XHRAborted)))))
+      id
+      (\_ -> bracket
+        (DOM.Event.on xhr DOM.Event.load onLoad)
+        id
+        (\_ -> do
+          DOM.XMLHttpRequest.send xhr reqBody
+          liftIO (takeMVar result))))
+
+instance (Json.FromJSON a) => Client (JSON a) where
+  -- note that we do not decode eagerly because it's often the case that the body
+  -- cannot be decoded since web servers return invalid json on errors
+  -- (e.g. "Internal server error" on a 500 rather than a json encoded error)
+  type RequestData (JSON a) = GetResponse (DOM.JSM (Either String a))
+  performRequest _p req (GetResponse f) = do
+    resp <- performXHR DOM.XMLHttpRequestResponseTypeText req
+    f (fmap (fmap (return . Json.eitherDecode . BSL.fromStrict . T.encodeUtf8)) resp)
+
+instance (Client next, Json.ToJSON a) => Client (ReqBodyJSON a next) where
+  type RequestData (ReqBodyJSON a next) = WithData a (RequestData next)
+  performRequest _p Request{..} (WithData x perf) = do
+    let s = JSaddle.toJSString (T.decodeUtf8 (BSL.toStrict (Json.encode x)))
+    performRequest
+      (Proxy @next) Request{reqBody = Just s, ..} perf
+
+#endif
+
 instance (Client next) => Client (ExtraHeaders next) where
   type RequestData (ExtraHeaders next) = RequestData next
   performRequest _p req perf = performRequest (Proxy @next) req perf
@@ -211,13 +285,6 @@ instance (Client next) => Client (ExtraHeaders next) where
 instance (Client next) => Client (NoCache next) where
   type RequestData (NoCache next) = RequestData next
   performRequest _p req perf = performRequest (Proxy @next) req perf
-
-instance (Client next, Json.ToJSON a) => Client (ReqBodyJSON a next) where
-  type RequestData (ReqBodyJSON a next) = WithData a (RequestData next)
-  performRequest _p Request{..} (WithData x perf) = do
-    s <- Json.toJSONString =<< Json.toJSON x
-    performRequest
-      (Proxy @next) Request{reqBody = Just s, ..} perf
 
 instance (Client next) => Client (WithIO next) where
   type RequestData (WithIO next) = RequestData next
