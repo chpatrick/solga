@@ -80,7 +80,6 @@ type Header = (Text, Text)
 
 data Request = forall body. (DOM.IsXMLHttpRequestBody body) => Request
   { reqMethod :: Text
-  , reqHost :: Text
   , reqSegments :: DList Text
   , reqQueryString :: Text
   , reqUser :: Maybe Text
@@ -202,7 +201,7 @@ performXHR :: DOM.XMLHttpRequestResponseType -> Request -> DOM.JSM (Either XHREr
 performXHR respType Request{..} = do
   let xhr = reqXHR
   DOM.setResponseType xhr respType
-  uri <- liftIO (js_encodeURI (reqHost <> "/" <> T.intercalate "/" (DList.toList reqSegments) <> reqQueryString))
+  uri <- liftIO (js_encodeURI ("/" <> T.intercalate "/" (DList.toList reqSegments) <> reqQueryString))
   DOM.open xhr reqMethod uri True reqUser reqPassword
   for_ reqHeaders (uncurry (DOM.setRequestHeader xhr))
   r <- case reqBody of
@@ -239,7 +238,7 @@ performXHR :: DOM.XMLHttpRequestResponseType -> Request -> DOM.JSM (Either XHREr
 performXHR respType Request{..} = do
   let xhr = reqXHR
   DOM.setResponseType xhr respType
-  let uri = Uri.encodeText (reqHost <> "/" <> T.intercalate "/" (DList.toList reqSegments) <> reqQueryString)
+  let uri = Uri.encodeText ("/" <> T.intercalate "/" (DList.toList reqSegments) <> reqQueryString)
   DOM.open xhr reqMethod uri True reqUser reqPassword
   for_ reqHeaders (uncurry (DOM.setRequestHeader xhr))
   result :: MVar (Either XHRError (Response Text)) <- liftIO newEmptyMVar
