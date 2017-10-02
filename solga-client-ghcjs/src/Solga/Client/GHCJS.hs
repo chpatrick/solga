@@ -64,7 +64,6 @@ import qualified Data.Aeson as Json
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import qualified Network.URI.Encode as Uri
 import qualified Data.ByteString.Lazy as BSL
 import qualified Language.Javascript.JSaddle as JSaddle
 import Control.Concurrent.MVar (takeMVar, tryPutMVar, MVar, newEmptyMVar)
@@ -74,6 +73,8 @@ import qualified JSDOM.Generated.XMLHttpRequest as DOM.XMLHttpRequest
 import Control.Monad.Catch (bracket)
 import Control.Monad (void)
 import Control.Monad.Trans.Class (lift)
+import qualified Network.HTTP.Types.URI as Http
+import qualified Data.Binary.Builder as BB
 #endif
 
 type Header = (Text, Text)
@@ -81,7 +82,7 @@ type Header = (Text, Text)
 data Request = forall body. (DOM.IsXMLHttpRequestBody body) => Request
   { reqMethod :: Text
   , reqSegments :: DList Text
-  , reqQueryString :: Text
+  , reqQuery :: DList (Text, Maybe Text)
   , reqUser :: Maybe Text
   , reqPassword :: Maybe Text
   , reqHeaders :: [Header]
@@ -201,7 +202,18 @@ performXHR :: DOM.XMLHttpRequestResponseType -> Request -> DOM.JSM (Either XHREr
 performXHR respType Request{..} = do
   let xhr = reqXHR
   DOM.setResponseType xhr respType
-  uri <- liftIO (js_encodeURI (T.intercalate "/" (DList.toList reqSegments) <> reqQueryString))
+  uri <- liftIO $ js_encodeURI $
+    "/" <>
+    T.intercalate "/" (DList.toList reqSegments) <>
+    case DList.toList reqQuery of
+      [] -> ""
+      query ->
+        "?" <> T.intercalate "&"
+          [ case mbV of
+              Nothing -> k
+              Just v -> k <> "=" <> v
+          | (k, mbV) <- query
+          ]
   DOM.open xhr reqMethod uri True reqUser reqPassword
   for_ reqHeaders (uncurry (DOM.setRequestHeader xhr))
   r <- case reqBody of
@@ -238,7 +250,11 @@ performXHR :: DOM.XMLHttpRequestResponseType -> Request -> DOM.JSM (Either XHREr
 performXHR respType Request{..} = do
   let xhr = reqXHR
   DOM.setResponseType xhr respType
-  let uri = Uri.encodeText (T.intercalate "/" (DList.toList reqSegments) <> reqQueryString)
+  let uri = T.decodeUtf8 $ BSL.toStrict $ BB.toLazyByteString $ Http.encodePath
+        (DList.toList reqSegments)
+        [ (T.encodeUtf8 k, fmap T.encodeUtf8 v)
+        | (k, v) <- DList.toList reqQuery
+        ]
   DOM.open xhr reqMethod uri True reqUser reqPassword
   for_ reqHeaders (uncurry (DOM.setRequestHeader xhr))
   result :: MVar (Either XHRError (Response Text)) <- liftIO newEmptyMVar

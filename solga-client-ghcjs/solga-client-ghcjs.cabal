@@ -23,13 +23,14 @@ library
   if !impl(ghcjs)
     build-depends:
       aeson,
-      uri-encode,
+      http-types,
       text,
       bytestring,
       jsaddle,
       jsaddle-dom,
       exceptions,
-      transformers
+      transformers,
+      binary
   else
     build-depends:
       ghcjs-base,
