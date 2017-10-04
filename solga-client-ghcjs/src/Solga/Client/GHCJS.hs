@@ -51,6 +51,13 @@ import qualified GHCJS.DOM.Types as DOM
 import qualified GHCJS.DOM.Enums as DOM
 import Data.Foldable (for_)
 import Control.Monad.IO.Class (liftIO)
+import Control.Exception.Safe (onException, bracket)
+import Control.Concurrent.MVar (takeMVar, tryPutMVar, MVar, newEmptyMVar)
+import qualified GHCJS.DOM.EventM as DOM.Event
+import qualified GHCJS.DOM.XMLHttpRequestEventTarget as DOM.Event
+import qualified GHCJS.DOM.XMLHttpRequest as DOM.XMLHttpRequest hiding (send)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad (void)
 
 import Solga.Core hiding (Header)
 
@@ -58,6 +65,7 @@ import Solga.Core hiding (Header)
 import qualified JavaScript.JSValJSON as Json
 import Data.JSString (JSString)
 import qualified Data.JSString as T
+import qualified GHCJS.DOM.JSFFI.Generated.XMLHttpRequest as DOM.XMLHttpRequest
 type Text = JSString
 #else
 import qualified Data.Aeson as Json
@@ -66,15 +74,9 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Lazy as BSL
 import qualified Language.Javascript.JSaddle as JSaddle
-import Control.Concurrent.MVar (takeMVar, tryPutMVar, MVar, newEmptyMVar)
-import qualified GHCJS.DOM.EventM as DOM.Event
-import qualified GHCJS.DOM.XMLHttpRequestEventTarget as DOM.Event
-import qualified JSDOM.Generated.XMLHttpRequest as DOM.XMLHttpRequest
-import Control.Monad.Catch (bracket)
-import Control.Monad (void)
-import Control.Monad.Trans.Class (lift)
 import qualified Network.HTTP.Types.URI as Http
 import qualified Data.Binary.Builder as BB
+import qualified JSDOM.Generated.XMLHttpRequest as DOM.XMLHttpRequest
 #endif
 
 type Header = (Text, Text)
@@ -186,23 +188,10 @@ data XHRError =
 
 newtype GetResponse a b = GetResponse {unGetResponse :: Either XHRError (Response a) -> DOM.JSM b}
 
+requestToUri :: Request -> DOM.JSM Text
+requestToUri Request{..} = do
 #if defined(ghcjs_HOST_OS)
-foreign import javascript interruptible
-  "h$solgaSendXHR($1, null, $c);"
-  js_send0 :: DOM.XMLHttpRequest -> IO Int
-foreign import javascript interruptible
-  "h$solgaSendXHR($1, $2, $c);"
-  js_send1 :: DOM.XMLHttpRequest -> DOM.JSVal -> IO Int
-
-foreign import javascript unsafe
-  "encodeURI($1)"
-  js_encodeURI :: Text -> IO Text
-
-performXHR :: DOM.XMLHttpRequestResponseType -> Request -> DOM.JSM (Either XHRError (Response DOM.JSVal))
-performXHR respType Request{..} = do
-  let xhr = reqXHR
-  DOM.setResponseType xhr respType
-  uri <- liftIO $ js_encodeURI $
+  liftIO $ js_encodeURI $
     "/" <>
     T.intercalate "/" (DList.toList reqSegments) <>
     case DList.toList reqQuery of
@@ -214,19 +203,44 @@ performXHR respType Request{..} = do
               Just v -> k <> "=" <> v
           | (k, mbV) <- query
           ]
+
+foreign import javascript unsafe
+  "encodeURI($1)"
+  js_encodeURI :: Text -> IO Text
+
+#else
+  return $ T.decodeUtf8 $ BSL.toStrict $ BB.toLazyByteString $ Http.encodePath
+    (DList.toList reqSegments)
+    [ (T.encodeUtf8 k, fmap T.encodeUtf8 v)
+    | (k, v) <- DList.toList reqQuery
+    ]
+#endif
+
+performXHR :: forall a. (DOM.XMLHttpRequest -> DOM.JSM a) -> DOM.XMLHttpRequestResponseType -> Request -> DOM.JSM (Either XHRError (Response a))
+performXHR getResp respType req@Request{..} = do
+  let xhr = reqXHR
+  DOM.setResponseType xhr respType
+  uri <- requestToUri req
   DOM.open xhr reqMethod uri True reqUser reqPassword
   for_ reqHeaders (uncurry (DOM.setRequestHeader xhr))
-  r <- case reqBody of
-    Nothing -> js_send0 xhr
-    Just body -> js_send1 xhr =<< DOM.toJSVal body
-  case r of
-    0 -> fmap Right $ do
-      status <- DOM.getStatus xhr
-      resp <- DOM.getResponse xhr
-      return (Response status resp)
-    1 -> return (Left XHRAborted)
-    2 -> return (Left XHRError)
-    _ -> error ("performXHR: bad return value " <> show r)
+  result :: MVar (Either XHRError (Response a)) <- liftIO newEmptyMVar
+  let onLoad = lift $ do
+        status <- DOM.getStatus xhr
+        resp <- getResp xhr
+        void (liftIO (tryPutMVar result (Right (Response status resp))))
+  let bracketId a b = bracket a id b
+  bracketId
+    (DOM.Event.on xhr DOM.Event.error (liftIO (void (tryPutMVar result (Left XHRError)))))
+    (\_ -> bracketId
+      (DOM.Event.on xhr DOM.Event.abortEvent (liftIO (void (tryPutMVar result (Left XHRAborted)))))
+      (\_ -> bracketId
+        (DOM.Event.on xhr DOM.Event.load onLoad)
+        (\_ ->
+          onException
+            (DOM.XMLHttpRequest.send xhr reqBody >> liftIO (takeMVar result))
+            (DOM.XMLHttpRequest.abort xhr))))
+
+#if defined(ghcjs_HOST_OS)
 
 instance (Json.FromJSON a) => Client (JSON a) where
   -- note that we do not decode eagerly because it's often the case that the body
@@ -234,7 +248,7 @@ instance (Json.FromJSON a) => Client (JSON a) where
   -- (e.g. "Internal server error" on a 500 rather than a json encoded error)
   type RequestData (JSON a) = GetResponse (IO (Either String a))
   performRequest _p req (GetResponse f) = do
-    resp <- performXHR DOM.XMLHttpRequestResponseTypeJson req
+    resp <- performXHR DOM.XMLHttpRequest.getResponse DOM.XMLHttpRequestResponseTypeJson req
     f (fmap (fmap (Json.runParser Json.parseJSON)) resp)
 
 instance (Client next, Json.ToJSON a) => Client (ReqBodyJSON a next) where
@@ -246,42 +260,13 @@ instance (Client next, Json.ToJSON a) => Client (ReqBodyJSON a next) where
 
 #else
 
-performXHR :: DOM.XMLHttpRequestResponseType -> Request -> DOM.JSM (Either XHRError (Response Text))
-performXHR respType Request{..} = do
-  let xhr = reqXHR
-  DOM.setResponseType xhr respType
-  let uri = T.decodeUtf8 $ BSL.toStrict $ BB.toLazyByteString $ Http.encodePath
-        (DList.toList reqSegments)
-        [ (T.encodeUtf8 k, fmap T.encodeUtf8 v)
-        | (k, v) <- DList.toList reqQuery
-        ]
-  DOM.open xhr reqMethod uri True reqUser reqPassword
-  for_ reqHeaders (uncurry (DOM.setRequestHeader xhr))
-  result :: MVar (Either XHRError (Response Text)) <- liftIO newEmptyMVar
-  let onLoad = lift $ do
-        status <- DOM.getStatus xhr
-        resp <- DOM.getResponseTextUnchecked xhr
-        void (liftIO (tryPutMVar result (Right (Response status resp))))
-  bracket
-    (DOM.Event.on xhr DOM.Event.error (liftIO (void (tryPutMVar result (Left XHRError)))))
-    id
-    (\_ -> bracket
-      (DOM.Event.on xhr DOM.Event.abortEvent (liftIO (void (tryPutMVar result (Left XHRAborted)))))
-      id
-      (\_ -> bracket
-        (DOM.Event.on xhr DOM.Event.load onLoad)
-        id
-        (\_ -> do
-          DOM.XMLHttpRequest.send xhr reqBody
-          liftIO (takeMVar result))))
-
 instance (Json.FromJSON a) => Client (JSON a) where
   -- note that we do not decode eagerly because it's often the case that the body
   -- cannot be decoded since web servers return invalid json on errors
   -- (e.g. "Internal server error" on a 500 rather than a json encoded error)
   type RequestData (JSON a) = GetResponse (DOM.JSM (Either String a))
   performRequest _p req (GetResponse f) = do
-    resp <- performXHR DOM.XMLHttpRequestResponseTypeText req
+    resp <- performXHR DOM.getResponseTextUnchecked DOM.XMLHttpRequestResponseTypeText req
     f (fmap (fmap (return . Json.eitherDecode . BSL.fromStrict . T.encodeUtf8)) resp)
 
 instance (Client next, Json.ToJSON a) => Client (ReqBodyJSON a next) where
