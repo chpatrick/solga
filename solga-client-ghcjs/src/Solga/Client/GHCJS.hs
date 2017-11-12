@@ -172,7 +172,7 @@ instance (Client next, ToSegment a) => Client (Capture a next) where
     performRequest (Proxy @next) (addSegment req (toSegment x)) perf
 
 instance (Client next, KnownSymbol method) => Client (Method method next) where
-  type RequestData (Method seg next) = RequestData next
+  type RequestData (Method method next) = RequestData next
   performRequest _p req perf = performRequest
     (Proxy @next) req{reqMethod = T.pack (symbolVal (Proxy @method))} perf
 
