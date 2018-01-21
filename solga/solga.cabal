@@ -1,5 +1,5 @@
 name:                solga
-version:             0.1.0.2
+version:             0.1.0.3
 synopsis:            Simple typesafe web routing
 description:         A library for easily specifying web APIs and implementing them in a type-safe way.
 license:             MIT

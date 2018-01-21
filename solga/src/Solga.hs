@@ -54,7 +54,6 @@ import           Control.Exception.Safe
 import           Control.Monad
 import           Control.Monad.Trans.Resource
 import qualified Data.Aeson as Aeson
-import qualified Data.Aeson.Encode as Aeson
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Char8 as Char8
 import qualified Data.Map.Strict as Map
@@ -238,8 +237,8 @@ instance (Aeson.FromJSON a, Router next) => Router (ReqBodyJSON a next) where
   tryRoute req = tryRouteNextIO getNext req
     where
       getNext rbj = do
-        reqBody <- Wai.requestBody req
-        case Aeson.eitherDecodeStrict reqBody of
+        reqBody <- Wai.strictRequestBody req
+        case Aeson.eitherDecode reqBody of
           Left err -> throwIO $ badRequest $ "Could not decode JSON request: " <> Text.pack (show err)
           Right val -> return (reqBodyJSONNext rbj val)
 
@@ -283,7 +282,7 @@ class Abbreviated a where
   type Brief a :: *
   type instance Brief a = a
   brief :: Brief a -> a
-  default brief :: a -> a
+  default brief :: Brief a ~ a => Brief a -> a
   brief = id
 
 instance Abbreviated Raw where
