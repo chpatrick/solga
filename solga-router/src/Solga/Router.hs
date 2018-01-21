@@ -159,8 +159,8 @@ instance (Aeson.FromJSON a, Router next) => Router (ReqBodyJSON a next) where
   tryRoute req = tryRouteNextIO getNext req
     where
       getNext rbj = do
-        reqBody <- Wai.requestBody req
-        case Aeson.eitherDecodeStrict reqBody of
+        reqBody <- Wai.strictRequestBody req
+        case Aeson.eitherDecode reqBody of
           Left err -> throwIO $ badRequest $ "Could not decode JSON request: " <> Text.pack (show err)
           Right val -> return (reqBodyJSONNext rbj val)
 
