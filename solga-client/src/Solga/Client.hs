@@ -155,6 +155,10 @@ instance (Client next) => Client (NoCache next) where
   type RequestData (NoCache next) = RequestData next
   performRequest _p req mgr perf = performRequest (Proxy @next) req mgr perf
 
+instance (Client next) => Client (RedirectOnTrailingSlash next) where
+  type RequestData (RedirectOnTrailingSlash next) = RequestData next
+  performRequest _p req mgr perf = performRequest (Proxy @next) req mgr perf
+
 instance (Client next, Aeson.ToJSON a) => Client (ReqBodyJSON a next) where
   type RequestData (ReqBodyJSON a next) = WithData a (RequestData next)
   performRequest _p req mgr (WithData x perf) = performRequest

@@ -40,6 +40,7 @@ module Solga.Core
   , ReqBodyMultipart(..)
   , Endpoint
   , (:<|>)(..)
+  , RedirectOnTrailingSlash(..)
   -- * FromSegment
   , FromSegment(..)
   ) where
@@ -160,3 +161,5 @@ instance FromSegment T.Text where
 instance FromSegment JSString where
   fromSegment = Just . textToJSString
 #endif
+
+newtype RedirectOnTrailingSlash next = RedirectOnTrailingSlash {unRedirectOnTrailingSlash :: next}

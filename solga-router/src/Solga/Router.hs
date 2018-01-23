@@ -186,6 +186,18 @@ instance (Router next) => Router (ReqBodyMultipart a next) where
         Left err -> throwIO $ badRequest $ "Could not decode form request: " <> Text.pack err
         Right val -> nextRouter (reqMultiPartNext rmp val) cont
 
+instance (Router next) => Router (RedirectOnTrailingSlash next) where
+  tryRoute req = do
+    let pathi = Wai.pathInfo req
+    let continue = tryRouteNext unRedirectOnTrailingSlash req
+    if null pathi
+      then continue
+      else if last pathi == ""
+        then do
+          let resp = Wai.responseLBS HTTP.status301 [(HTTP.hLocation, Wai.rawPathInfo req)] ""
+          return (\_ cont -> cont resp)
+        else continue
+
 -- | Most `Router`s are really just newtypes. By using `brief`, you can
 --   construct trees of `Router`s by providing only their inner types, much
 --   like Servant.

@@ -286,6 +286,10 @@ instance (Client next) => Client (NoCache next) where
   type RequestData (NoCache next) = RequestData next
   performRequest _p req perf = performRequest (Proxy @next) req perf
 
+instance (Client next) => Client (RedirectOnTrailingSlash next) where
+  type RequestData (RedirectOnTrailingSlash next) = RequestData next
+  performRequest _p req perf = performRequest (Proxy @next) req perf
+
 instance (Client next) => Client (WithIO next) where
   type RequestData (WithIO next) = RequestData next
   performRequest _p req perf = performRequest (Proxy @next) req perf
