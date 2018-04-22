@@ -82,15 +82,12 @@ tryRouteNextIO f req = do
     next <- f router
     nextRouter next cont
 
--- | Serve a `Router` with Solga, returning `SolgaError`s as HTTP responses and other errors as HTTP 500.
+-- | Serve a `Router` with Solga, returning `SolgaError`s as HTTP responses.
 serve :: Router r => r -> Wai.Application
 serve router req cont =
   serveThrow router req cont
-    `catchAny` \someEx ->
-      let
-        ( status, body ) = case fromException someEx of
-          Just SolgaError { errorStatus, errorMessage } -> ( errorStatus, Builder.byteString $ encodeUtf8 errorMessage )
-          Nothing -> ( HTTP.internalServerError500, "Internal Server Error" )
+    `catch` \SolgaError{ errorStatus, errorMessage } ->
+      let ( status, body ) = ( errorStatus, Builder.byteString $ encodeUtf8 errorMessage )
       in cont $ Wai.responseBuilder status [] body
 
 -- | Serve a `Router` with Solga, throwing `SolgaError`s.
