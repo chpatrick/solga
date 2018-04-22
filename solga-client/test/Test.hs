@@ -47,7 +47,7 @@ testAPI :: TestAPI
 testAPI = TestAPI
   { basic = brief (return "basic")
   , echoJSON = brief return
-  , internalError = brief (return $ error "quality programming")
+  , internalError = brief (error "quality programming")
   , echoCapture = brief return
   }
 
@@ -82,7 +82,7 @@ spec port = do
 
   -- tests exception handling
   describe "GET /fubar" $ do
-    it "responds with 500" $
+    it "responds with 500" $ do
       req port $ choose internalError $ GetResponse $ \resp _ ->
         Http.responseStatus resp `shouldBe` status500
 

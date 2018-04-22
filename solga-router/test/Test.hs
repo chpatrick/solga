@@ -36,7 +36,6 @@ main = hspec spec
 data TestAPI = TestAPI
   { basic :: "basic" /> Get T.Text
   , echoJSON :: "echo-json" /> ReqBodyJSON Value :> Post Value
-  , internalError :: "fubar" /> Get T.Text
   , echoCapture :: "echo-capture" /> Capture T.Text :> Get T.Text
   } deriving (Generic)
 instance Router TestAPI
@@ -45,7 +44,6 @@ testAPI :: TestAPI
 testAPI = TestAPI
   { basic = brief (return "basic")
   , echoJSON = brief return
-  , internalError = brief (return $ error "quality programming")
   , echoCapture = brief return
   }
 
@@ -78,11 +76,6 @@ spec = with (return $ serve testAPI) $ do
     it "responds with same JSON" $ property $ \val -> do
       resp <- post "/echo-json" (encode val)
       liftIO $ decode (simpleBody resp) `shouldBe` Just (val :: Value)
-
-  -- tests exception handling
-  describe "GET /fubar" $ do
-    it "responds with 500" $
-      get "/fubar" `shouldRespondWith` 500
 
   -- tests Capture
   describe "GET /echo-capture" $ do
