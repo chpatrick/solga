@@ -38,6 +38,7 @@ import           Control.Monad
 import           Control.Monad.Trans.Resource
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Builder as Builder
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as Char8
 import qualified Data.Map.Strict as Map
 import           Data.Monoid
@@ -195,6 +196,9 @@ instance (Router next) => Router (RedirectOnTrailingSlash next) where
           return (\_ cont -> cont resp)
         else continue
 
+instance Router next => Router (WithReferer next) where
+  tryRoute req = tryRouteNext (\(WithReferer f) -> f (Wai.requestHeaderReferer req)) req
+
 -- | Most `Router`s are really just newtypes. By using `brief`, you can
 --   construct trees of `Router`s by providing only their inner types, much
 --   like Servant.
@@ -256,6 +260,10 @@ instance Abbreviated next => Abbreviated (WithIO next) where
   brief = WithIO . fmap brief
 
 instance Abbreviated (ReqBodyMultipart a next)
+
+instance Abbreviated next => Abbreviated (WithReferer next) where
+  type Brief (WithReferer next) = Maybe BS.ByteString -> Brief next
+  brief = WithReferer . fmap brief
 
 -- Generic routers
 

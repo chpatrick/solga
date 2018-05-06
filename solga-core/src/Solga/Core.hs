@@ -41,6 +41,7 @@ module Solga.Core
   , Endpoint
   , (:<|>)(..)
   , RedirectOnTrailingSlash(..)
+  , WithReferer(..)
   -- * FromSegment
   , FromSegment(..)
   ) where
@@ -163,3 +164,5 @@ instance FromSegment JSString where
 #endif
 
 newtype RedirectOnTrailingSlash next = RedirectOnTrailingSlash {unRedirectOnTrailingSlash :: next}
+
+newtype WithReferer next = WithReferer { withRefererNext :: Maybe ByteString -> next }
