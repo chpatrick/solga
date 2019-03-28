@@ -1,9 +1,10 @@
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE CPP                  #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE DeriveGeneric        #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE QuasiQuotes          #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE TypeOperators        #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Main (main) where
@@ -93,7 +94,9 @@ spec = with (return $ serve testAPI) $ do
       resp <- get path
       liftIO $ decode (simpleBody resp) `shouldBe` Just (String seg)
 
+#if __GLASGOW_HASKELL__ < 802
 deriving instance Generic Value
+#endif
 
 instance Arbitrary Value where
   arbitrary = sized arbJSON
