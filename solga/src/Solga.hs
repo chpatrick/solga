@@ -54,7 +54,6 @@ import           Control.Exception.Safe
 import           Control.Monad
 import           Control.Monad.Trans.Resource
 import qualified Data.Aeson as Aeson
-import qualified Data.Aeson.Encode as Aeson
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Char8 as Char8
 import qualified Data.Map.Strict as Map
@@ -170,7 +169,7 @@ data OneOfSegs (segs :: [ Symbol ]) next = OneOfSegs { oneOfSegsNext :: next }
 instance (KnownSymbol seg, Router next, Router (OneOfSegs segs next)) => Router (OneOfSegs (seg ': segs) next) where
   tryRoute = tryRouteNext $ \(OneOfSegs next) -> (Seg next :: Seg seg next) :<|> (OneOfSegs next :: OneOfSegs segs next)
 
-instance Router next => Router (OneOfSegs '[] next) where
+instance Router (OneOfSegs '[] next) where
   tryRoute _ = Nothing
 
 -- | The class of types that can be parsed from a path segment.
@@ -283,7 +282,7 @@ class Abbreviated a where
   type Brief a :: *
   type instance Brief a = a
   brief :: Brief a -> a
-  default brief :: a -> a
+  default brief :: Brief a ~ a => Brief a -> a
   brief = id
 
 instance Abbreviated Raw where
