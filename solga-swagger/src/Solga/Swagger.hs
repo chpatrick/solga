@@ -194,6 +194,6 @@ instance (Typeable a, ToParamSchema a, RouterSwagger next) => RouterSwagger (Cap
     let pOtherSchema = mempty & in_ .~ ParamPath & paramSchema .~ pSchema
     let param = mempty & name .~ paramName & required .~ Just True & schema .~ ParamOther pOtherSchema
     genPaths (nextProxy p) newCtx
-      { pathSegments  = pathSegments ctx `DL.snoc` paramName
+      { pathSegments  = pathSegments ctx `DL.snoc` ("{" <> paramName <> "}")
       , operationContext = operationContext newCtx & parameters <>~ [ Inline param ]
       }
