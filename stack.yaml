@@ -11,12 +11,6 @@ packages:
 - 'solga-router'
 - 'solga-client'
 - 'solga-client-ghcjs'
-- location:
-    git: https://github.com/bitonic/jsaddle.git
-    commit: 40b17863a3d4de7346e80937931cc04c8b4b3cd6
-  subdirs:
-  - jsaddle
-  extra-dep: true
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
@@ -25,6 +19,10 @@ extra-deps:
 - ghcjs-dom-jsaddle-0.9.2.0
 - jsaddle-dom-0.9.2.0
 - ref-tf-0.4.0.1
+- git: https://github.com/bitonic/jsaddle.git
+  commit: 40b17863a3d4de7346e80937931cc04c8b4b3cd6
+  subdirs:
+  - jsaddle
 
 # Override default flag values for local packages and extra-deps
 flags: {}
