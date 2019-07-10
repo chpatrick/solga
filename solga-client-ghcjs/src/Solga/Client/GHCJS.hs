@@ -84,6 +84,7 @@ type Header = (Text, Text)
 data Request = forall body. (DOM.IsXMLHttpRequestBody body) => Request
   { reqMethod :: Text
   , reqSegments :: DList Text
+  , reqBaseUrl :: Text
   , reqQuery :: DList (Text, Maybe Text)
   , reqUser :: Maybe Text
   , reqPassword :: Maybe Text
@@ -192,7 +193,7 @@ requestToUri :: Request -> DOM.JSM Text
 requestToUri Request{..} = do
 #if defined(ghcjs_HOST_OS)
   liftIO $ js_encodeURI $
-    "/" <>
+    reqBaseUrl <>
     T.intercalate "/" (DList.toList reqSegments) <>
     case DList.toList reqQuery of
       [] -> ""
