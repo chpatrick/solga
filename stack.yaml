@@ -11,6 +11,7 @@ packages:
 - 'solga-router'
 - 'solga-client'
 - 'solga-client-ghcjs'
+- 'solga-typescript'
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
@@ -19,6 +20,8 @@ extra-deps:
 - jsaddle-dom-0.9.4.0
 - jsaddle-0.9.7.0
 - ref-tf-0.4.0.2
+- git: https://github.com/bitonic/aeson-typescript.git
+  commit: 9dd14a8172f3cd715b07a3d9ec8cd1e049020215
 
 # Override default flag values for local packages and extra-deps
 flags: {}
