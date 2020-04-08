@@ -108,6 +108,11 @@ instance Router next => Router (End next) where
     [] -> tryRouteNext endNext req
     _ -> Nothing
 
+instance Router next => Router (Hidden next) where
+  tryRoute req = case Wai.pathInfo req of
+    [] -> tryRouteNext hiddenNext req
+    _ -> Nothing
+
 instance (KnownSymbol seg, Router next) => Router (Seg seg next) where
   tryRoute req = case Wai.pathInfo req of
     s : segs | Text.unpack s == symbolVal (Proxy :: Proxy seg) ->
@@ -220,6 +225,10 @@ instance Abbreviated (RawResponse a) where
 instance Abbreviated next => Abbreviated (End next) where
   type Brief (End next) = Brief next
   brief = End . brief
+
+instance Abbreviated next => Abbreviated (Hidden next) where
+  type Brief (Hidden next) = Brief next
+  brief = Hidden . brief
 
 instance Abbreviated next => Abbreviated (Seg seg next) where
   type Brief (Seg seg next) = Brief next

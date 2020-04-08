@@ -17,6 +17,7 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE EmptyCase #-}
 module Solga.Client
   ( Client(..)
   , SomeRequestData(..)
@@ -25,6 +26,7 @@ module Solga.Client
   , ToSegment(..)
   , WithData(..)
   , GetResponse(..)
+  , HiddenRequestData
   ) where
 
 import Data.Kind
@@ -77,6 +79,12 @@ instance Client (RawResponse a) where
 instance (Client next) => Client (End next) where
   type RequestData (End next) = RequestData next
   performRequest _p mgr req perf = performRequest (Proxy @next) mgr req perf
+
+data HiddenRequestData a
+
+instance Client (Hidden next) where
+  type RequestData (Hidden next) = HiddenRequestData
+  performRequest _p _mgr _req perf = case perf of {}
 
 addSegment :: Http.Request -> Text -> Http.Request
 addSegment req segtxt = req

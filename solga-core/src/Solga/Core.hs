@@ -42,6 +42,7 @@ module Solga.Core
   , (:<|>)(..)
   , RedirectOnTrailingSlash(..)
   , WithReferer(..)
+  , Hidden(..)
   -- * FromSegment
   , FromSegment(..)
   ) where
@@ -166,3 +167,7 @@ instance FromSegment JSString where
 newtype RedirectOnTrailingSlash next = RedirectOnTrailingSlash {unRedirectOnTrailingSlash :: next}
 
 newtype WithReferer next = WithReferer { withRefererNext :: Maybe ByteString -> next }
+
+-- | To hide from client libraries
+newtype Hidden next = Hidden {hiddenNext :: next}
+

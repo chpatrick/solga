@@ -24,6 +24,7 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE EmptyCase #-}
 module Solga.Client.GHCJS
   ( Client(..)
   , SomeRequestData(..)
@@ -36,6 +37,7 @@ module Solga.Client.GHCJS
   , Response(..)
   , Header
   , XHRError(..)
+  , HiddenRequestData
   ) where
 
 import Data.Kind
@@ -125,6 +127,12 @@ instance Client (RawResponse a) where
 instance (Client next) => Client (End next) where
   type RequestData (End next) = RequestData next
   performRequest _p req perf = performRequest (Proxy @next) req perf
+
+data HiddenRequestData a
+
+instance Client (Hidden next) where
+  type RequestData (Hidden next) = HiddenRequestData
+  performRequest _p _req perf = case perf of {}
 
 addSegment :: Request -> Text -> Request
 addSegment req seg = req{reqSegments = reqSegments req <> DList.singleton seg}
