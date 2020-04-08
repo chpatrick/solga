@@ -204,8 +204,14 @@ data TypeScriptSeg
   = TSSConst T.Text
   | TSSVar T.Text
 
-typeScript :: (TypeScriptRoute a) => Proxy a -> T.Text -> T.Text
-typeScript p name = case generateTypeScript p of
+typeScript ::
+     (TypeScriptRoute a)
+  => Proxy a
+  -> [Aeson.TSType]
+  -- ^ Additional types that we want to add
+  -> T.Text
+  -> T.Text
+typeScript p additionalTypes name = case generateTypeScript p of
   Left err -> error err
   Right (paths, types) -> let
     dict = go paths
@@ -213,7 +219,7 @@ typeScript p name = case generateTypeScript p of
       [ T.pack $ Aeson.formatTSDeclarations'
           Aeson.defaultFormattingOptions{ Aeson.exportTypes = True }
           (do
-            Aeson.TSType typ <- S.toList (Aeson.getTransitiveClosure types)
+            Aeson.TSType typ <- S.toList (Aeson.getTransitiveClosure (S.union types (S.fromList additionalTypes)))
             Aeson.getTypeScriptDeclarations typ)
       , ""
       , "export function " <> name <> "(baseUrl: string, send: {send<A>(url: string, method: string): Promise<A>, sendJson<A, B>(url: string, method: string, req: A): Promise<B>, sendForm<A>(url: string, method: string, req: FormData): Promise<A>}): " <> renderDictType dict <> " { return " <> renderDictExpr "send" "baseUrl" [] dict <> "; }"
