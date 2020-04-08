@@ -214,12 +214,7 @@ typeScript p name = case generateTypeScript p of
           Aeson.TSType typ <- S.toList (Aeson.getTransitiveClosure types)
           Aeson.getTypeScriptDeclarations typ
       , ""
-      , "interface Send {"
-      , "  send<A>(url: string, method: string): Promise<A>,"
-      , "  sendJson<A, B>(url: string, method: string, req: A): Promise<B>,"
-      , "  sendForm<A>(url: string, method: string, req: FormData): Promise<A>,"
-      , "}"
-      , "function " <> name <> "(baseUrl: string, send: Send): " <> renderDictType dict <> " { return " <> renderDictExpr "send" "baseUrl" [] dict <> "; }"
+      , "export function " <> name <> "(baseUrl: string, send: {send<A>(url: string, method: string): Promise<A>, sendJson<A, B>(url: string, method: string, req: A): Promise<B>, sendForm<A>(url: string, method: string, req: FormData): Promise<A>}): " <> renderDictType dict <> " { return " <> renderDictExpr "send" "baseUrl" [] dict <> "; }"
       ]
   where
     emptyDict = TypeScriptDict{ tsdSegments = mempty, tsdCapture = Nothing, tsdSend = Nothing }
@@ -277,7 +272,7 @@ typeScript p name = case generateTypeScript p of
       , case tsdCapture dict of
           Nothing -> []
           Just ty -> ["\"param\": (p: string) => " <> renderDictType ty <> ", "]
-      , if HMS.size (tsdSegments dict) > 0 then ["\"routes\": " <> renderRoutesTypes (tsdSegments dict)] else []
+      , if HMS.size (tsdSegments dict) > 0 then ["\"route\": " <> renderRoutesTypes (tsdSegments dict)] else []
       , ["}"]
       ]
 
@@ -315,7 +310,7 @@ typeScript p name = case generateTypeScript p of
           Just ty -> let
             v = "param" <> T.pack (show (length segs))
             in ["\"param\": (" <> v <> ": string): " <> renderDictType ty <> " => { return " <> renderDictExpr sendVar baseUrlVar (TSSVar v : segs) ty <> "; }, "]
-      , if HMS.size (tsdSegments dict) > 0 then ["\"routes\": " <> renderRoutesExprs sendVar baseUrlVar segs (tsdSegments dict)] else []
+      , if HMS.size (tsdSegments dict) > 0 then ["\"route\": " <> renderRoutesExprs sendVar baseUrlVar segs (tsdSegments dict)] else []
       , ["}"]
       ]
 
