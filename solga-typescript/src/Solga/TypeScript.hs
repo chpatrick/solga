@@ -210,9 +210,11 @@ typeScript p name = case generateTypeScript p of
   Right (paths, types) -> let
     dict = go paths
     in T.unlines
-      [ T.pack $ Aeson.formatTSDeclarations $ do
-          Aeson.TSType typ <- S.toList (Aeson.getTransitiveClosure types)
-          Aeson.getTypeScriptDeclarations typ
+      [ T.pack $ Aeson.formatTSDeclarations'
+          Aeson.defaultFormattingOptions{ Aeson.exportTypes = True }
+          (do
+            Aeson.TSType typ <- S.toList (Aeson.getTransitiveClosure types)
+            Aeson.getTypeScriptDeclarations typ)
       , ""
       , "export function " <> name <> "(baseUrl: string, send: {send<A>(url: string, method: string): Promise<A>, sendJson<A, B>(url: string, method: string, req: A): Promise<B>, sendForm<A>(url: string, method: string, req: FormData): Promise<A>}): " <> renderDictType dict <> " { return " <> renderDictExpr "send" "baseUrl" [] dict <> "; }"
       ]
