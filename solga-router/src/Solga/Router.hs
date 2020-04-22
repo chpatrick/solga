@@ -109,9 +109,7 @@ instance Router next => Router (End next) where
     _ -> Nothing
 
 instance Router next => Router (Hidden next) where
-  tryRoute req = case Wai.pathInfo req of
-    [] -> tryRouteNext hiddenNext req
-    _ -> Nothing
+  tryRoute = tryRouteNext hiddenNext
 
 instance (KnownSymbol seg, Router next) => Router (Seg seg next) where
   tryRoute req = case Wai.pathInfo req of
