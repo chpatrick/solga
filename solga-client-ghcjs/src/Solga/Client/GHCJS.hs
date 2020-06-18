@@ -228,9 +228,9 @@ foreign import javascript unsafe
 performXHR :: forall a. (DOM.XMLHttpRequest -> DOM.JSM a) -> DOM.XMLHttpRequestResponseType -> Request -> DOM.JSM (Either XHRError (Response a))
 performXHR getResp respType req@Request{..} = do
   let xhr = reqXHR
-  DOM.setResponseType xhr respType
   uri <- requestToUri req
   DOM.open xhr reqMethod uri True reqUser reqPassword
+  DOM.setResponseType xhr respType
   for_ reqHeaders (uncurry (DOM.setRequestHeader xhr))
   result :: MVar (Either XHRError (Response a)) <- liftIO newEmptyMVar
   let onLoad = lift $ do
