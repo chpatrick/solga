@@ -19,7 +19,7 @@ module Solga.Router
   -- * Abbreviation
   , Abbreviated(..)
   -- * Error handling
-  , SolgaError
+  , SolgaError(..)
   , badRequest
   , unauthorized
   , forbidden
