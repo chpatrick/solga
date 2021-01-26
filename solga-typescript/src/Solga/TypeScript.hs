@@ -204,6 +204,16 @@ data TypeScriptSeg
   = TSSConst T.Text
   | TSSVar T.Text
 
+
+sendFunctions :: T.Text
+sendFunctions =
+  " export interface SendFunctions { \
+  \   baseUrl: string; \
+  \   send<A>(url: string, method: string): Promise<A>, \
+  \   sendJson<A, B>(url: string, method: string, req: A): Promise<B>, \
+  \   sendForm<A>(url: string, method: string, req: FormData): Promise<A> \
+  \ }"
+
 typeScript ::
      (TypeScriptRoute a)
   => Proxy a
@@ -222,7 +232,9 @@ typeScript p additionalTypes name = case generateTypeScript p of
             Aeson.TSType typ <- S.toList (Aeson.getTransitiveClosure (S.union types (S.fromList additionalTypes)))
             Aeson.getTypeScriptDeclarations typ)
       , ""
-      , "export function " <> name <> "(baseUrl: string, send: {send<A>(url: string, method: string): Promise<A>, sendJson<A, B>(url: string, method: string, req: A): Promise<B>, sendForm<A>(url: string, method: string, req: FormData): Promise<A>}): " <> renderDictType dict <> " { return " <> renderDictExpr "send" "baseUrl" [] dict <> "; }"
+      , sendFunctions
+      , ""
+      , "export const " <> name <> ": " <> renderDictType dict <> " = " <> renderDictExpr [] dict <> ";"
       ]
   where
     emptyDict = TypeScriptDict{ tsdSegments = mempty, tsdCapture = Nothing, tsdSend = Nothing }
@@ -270,7 +282,7 @@ typeScript p additionalTypes name = case generateTypeScript p of
       , case tsdSend dict of
           Nothing -> []
           Just TypeScriptSend{..} ->
-            [ "\"send\": (" <>
+            [ "\"s\": (_: SendFunctions, " <>
               (case tssReq of
                 TSRJson j -> "req: " <> j
                 TSRMultipart -> "req: FormData"
@@ -279,8 +291,8 @@ typeScript p additionalTypes name = case generateTypeScript p of
             ]
       , case tsdCapture dict of
           Nothing -> []
-          Just ty -> ["\"param\": (p: string) => " <> renderDictType ty <> ", "]
-      , if HMS.size (tsdSegments dict) > 0 then ["\"route\": " <> renderRoutesTypes (tsdSegments dict)] else []
+          Just ty -> ["\"p\": (_: string) => " <> renderDictType ty <> ", "]
+      , if HMS.size (tsdSegments dict) > 0 then ["\"r\": " <> renderRoutesTypes (tsdSegments dict)] else []
       , ["}"]
       ]
 
@@ -292,7 +304,7 @@ typeScript p additionalTypes name = case generateTypeScript p of
       , ["}"]
       ]
 
-    renderDictExpr sendVar baseUrlVar segs dict = T.concat $ concat
+    renderDictExpr segs dict = T.concat $ concat
       [ ["{"]
       , case tsdSend dict of
           Nothing -> []
@@ -300,32 +312,32 @@ typeScript p additionalTypes name = case generateTypeScript p of
             segToExpr = \case
               TSSConst c -> T.pack (show c)
               TSSVar v -> v
-            urlExpr = baseUrlVar <> " + [" <> T.intercalate ", " (map segToExpr (reverse segs)) <> "].join('/')"
+            urlExpr = "sf.baseUrl + [" <> T.intercalate ", " (map segToExpr (reverse segs)) <> "].join('/')"
             in
-              [ "\"send\": (" <>
+              [ "\"s\": (sf: SendFunctions, " <>
                 (case tssReq of
                   TSRJson j -> "req: " <> j
                   TSRMultipart -> "req: FormData"
                   TSRNoBody -> "") <>
                 "): Promise<" <> tssResp <> "> => { return " <>
                 (case tssReq of
-                  TSRJson{} -> sendVar <> ".sendJson(" <> urlExpr <> ", " <> T.pack (show tssMethod) <> ", req)"
-                  TSRMultipart{} -> sendVar <> ".sendForm(" <> urlExpr <> ", " <> T.pack (show tssMethod) <> ", req)"
-                  TSRNoBody{} -> sendVar <> ".send(" <> urlExpr <> ", " <> T.pack (show tssMethod) <> ")") <> "; },"
+                  TSRJson{} -> "sf.sendJson(" <> urlExpr <> ", " <> T.pack (show tssMethod) <> ", req)"
+                  TSRMultipart{} -> "sf.sendForm(" <> urlExpr <> ", " <> T.pack (show tssMethod) <> ", req)"
+                  TSRNoBody{} -> "sf.send(" <> urlExpr <> ", " <> T.pack (show tssMethod) <> ")") <> "; },"
               ]
       , case tsdCapture dict of
           Nothing -> []
           Just ty -> let
             v = "param" <> T.pack (show (length segs))
-            in ["\"param\": (" <> v <> ": string): " <> renderDictType ty <> " => { return " <> renderDictExpr sendVar baseUrlVar (TSSVar v : segs) ty <> "; }, "]
-      , if HMS.size (tsdSegments dict) > 0 then ["\"route\": " <> renderRoutesExprs sendVar baseUrlVar segs (tsdSegments dict)] else []
+            in ["\"p\": (" <> v <> ": string): " <> renderDictType ty <> " => { return " <> renderDictExpr (TSSVar v : segs) ty <> "; }, "]
+      , if HMS.size (tsdSegments dict) > 0 then ["\"r\": " <> renderRoutesExprs segs (tsdSegments dict)] else []
       , ["}"]
       ]
 
-    renderRoutesExprs sendVar baseUrlVar segs newSegs = T.concat $ concat
+    renderRoutesExprs segs newSegs = T.concat $ concat
       [ ["{"]
       , do
           (seg, ty) <- HMS.toList newSegs
-          return (T.pack (show seg) <> ": " <> renderDictExpr sendVar baseUrlVar (TSSConst seg : segs) ty <> ", ")
+          return (T.pack (show seg) <> ": " <> renderDictExpr (TSSConst seg : segs) ty <> ", ")
       , ["}"]
       ]
