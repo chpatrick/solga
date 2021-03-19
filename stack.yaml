@@ -1,16 +1,27 @@
 # For more information, see: https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: nightly-2016-11-07
+resolver: lts-14.22
 
 # Local packages, usually specified by relative directory name
 packages:
 - 'solga'
 - 'solga-swagger'
+- 'solga-core'
+- 'solga-router'
+- 'solga-client'
+- 'solga-client-ghcjs'
+- 'solga-typescript'
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
-- safe-exceptions-0.1.1.0
+- ghcjs-dom-0.9.4.0
+- ghcjs-dom-jsaddle-0.9.4.0
+- jsaddle-dom-0.9.4.0
+- jsaddle-0.9.7.0
+- ref-tf-0.4.0.2
+- git: https://github.com/bitonic/aeson-typescript.git
+  commit: 13822f06e45b632446bf6e9b6e8368c060e159b5
 
 # Override default flag values for local packages and extra-deps
 flags: {}

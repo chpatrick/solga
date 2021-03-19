@@ -1,12 +1,12 @@
-name:                solga-swagger
-version:             0.1.0.2
-synopsis:            Swagger generation for Solga
-description:         Swagger generation for Solga
+name:                solga-typescript
+version:             0.1.0.0
+synopsis:            TypeScript types generation for Solga
+description:         TypeScript types generation for Solga
 license:             MIT
 license-file:        LICENSE
-author:              Patrick Chilton
-maintainer:          chpatrick@gmail.com
-copyright:           Copyright (C) 2016 Patrick Chilton
+author:              Francesco Mazzoli
+maintainer:          f@mazzo.li
+copyright:           Copyright (C) 2019 Francesco Mazzoli
 category:            Web
 build-type:          Simple
 homepage:            https://github.com/chpatrick/solga
@@ -15,18 +15,16 @@ bug-reports:         https://github.com/chpatrick/solga/issues
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Solga.Swagger
+  exposed-modules:     Solga.TypeScript
   build-depends:       base >= 4.8 && < 5,
                        solga-core,
-                       swagger2 >= 2.1,
-                       lens,
+                       aeson-typescript,
+                       aeson,
                        text,
                        unordered-containers,
-                       mtl,
-                       http-types,
-                       bytestring,
+                       containers,
                        dlist,
-                       insert-ordered-containers
+                       case-insensitive
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -Wall

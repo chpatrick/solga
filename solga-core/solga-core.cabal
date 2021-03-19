@@ -1,5 +1,5 @@
-name:                solga
-version:             0.1.0.3
+name:                solga-core
+version:             0.1.0.0
 synopsis:            Simple typesafe web routing
 description:         A library for easily specifying web APIs and implementing them in a type-safe way.
 license:             MIT
@@ -15,10 +15,15 @@ bug-reports:         https://github.com/chpatrick/solga/issues
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Solga
+  exposed-modules:     Solga.Core
   build-depends:       base >= 4.8 && < 5,
-                       solga-core,
-                       solga-router
+                       case-insensitive,
+                       bytestring,
+                       text
+  if impl(ghcjs)
+    build-depends:
+      ghcjs-base
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -Wall
+

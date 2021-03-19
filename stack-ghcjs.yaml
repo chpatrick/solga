@@ -1,0 +1,23 @@
+packages:
+- 'solga-core'
+- 'solga-client-ghcjs'
+- location:
+    git: https://github.com/bitonic/jsval-json.git
+    commit: 5e24033a30afd832ed064be5c51621cf433baada
+  extra-dep: true
+allow-newer: true
+flags: {}
+extra-package-dbs: []
+extra-deps:
+- ghcjs-dom-0.9.2.0
+- ghcjs-dom-jsffi-0.9.2.0
+
+resolver: lts-8.11
+compiler: ghcjs-0.2.1.9008011_ghc-8.0.2
+compiler-check: match-exact
+setup-info:
+  ghcjs:
+    source:
+      ghcjs-0.2.1.9008011_ghc-8.0.2:
+        url: https://github.com/matchwood/ghcjs-stack-dist/raw/master/ghcjs-0.2.1.9008011.tar.gz
+        sha1: a72a5181124baf64bcd0e68a8726e65914473b3b
