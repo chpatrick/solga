@@ -12,7 +12,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 module Solga.TypeScript
-  ( Info(..)
+  ( HeaderInfo(..)
+  , Info(..)
   , Paths(..)
   , TypeScriptRoute(..)
   , typeScript
@@ -33,6 +34,7 @@ import Data.List (foldl')
 import Data.Monoid ((<>))
 import Control.Monad (guard)
 import qualified Data.Set as S
+import qualified Data.CaseInsensitive as CI
 
 {-
 export class TypeScriptRoute {
@@ -59,9 +61,14 @@ deriveTypeScript (defaultOptions {fieldLabelModifier = drop 3, constructorTagMod
 -- The strategy is to build a single TypeScript type to represent all the possible
 -- requests that we can do.
 
+data HeaderInfo = HeaderInfo
+  { hiOptional :: Bool }
+  deriving (Eq, Show)
+
 data Info = Info
   { infoReqJSON :: Maybe T.Text
   , infoReqMultiPart :: Bool
+  , infoReqHeaders :: HMS.HashMap (CI.CI T.Text) HeaderInfo
   , infoRespJSON :: Maybe T.Text
   , infoRespRaw :: Bool
   , infoMethod :: Maybe T.Text
@@ -78,6 +85,7 @@ generateTypeScript :: forall a. (TypeScriptRoute a) => Proxy a -> Either String 
 generateTypeScript _ = typeScriptRoute (Proxy @a) Info
   { infoReqJSON = Nothing
   , infoReqMultiPart = False
+  , infoReqHeaders = mempty
   , infoRespJSON = Nothing
   , infoRespRaw = False
   , infoMethod = Nothing
@@ -191,6 +199,7 @@ data TypeScriptReq
 data TypeScriptSend = TypeScriptSend
   { tssMethod :: T.Text
   , tssReq :: TypeScriptReq
+  , tssHeaders :: HMS.HashMap (CI.CI T.Text) HeaderInfo
   , tssResp :: T.Text
   }
 
@@ -209,9 +218,9 @@ sendFunctions :: T.Text
 sendFunctions =
   " export interface SendFunctions { \
   \   baseUrl: string; \
-  \   send<A>(url: string, method: string): Promise<A>, \
-  \   sendJson<A, B>(url: string, method: string, req: A): Promise<B>, \
-  \   sendForm<A>(url: string, method: string, req: FormData): Promise<A> \
+  \   send<A>(url: string, method: string, headers: {[k: string]: string | undefined}): Promise<A>, \
+  \   sendJson<A, B>(url: string, method: string, headers: {[k: string]: string | undefined}, req: A): Promise<B>, \
+  \   sendForm<A>(url: string, method: string, headers: {[k: string]: string | undefined}, req: FormData): Promise<A> \
   \ }"
 
 typeScript ::
@@ -271,7 +280,14 @@ typeScript p additionalTypes name = case generateTypeScript p of
             (False, Just j) -> TSRJson j
             (True, Just{}) -> error "Got both multipart and json req body"
             (False, Nothing) -> TSRNoBody
-          in mergeDicts dict0 emptyDict{ tsdSend = Just TypeScriptSend{ tssMethod = fromMaybe "GET" (infoMethod info), tssReq = req, tssResp = fromMaybe "void" (infoRespJSON info) } }
+          in mergeDicts dict0 emptyDict
+            { tsdSend = Just TypeScriptSend
+                { tssMethod = fromMaybe "GET" (infoMethod info)
+                , tssReq = req
+                , tssResp = fromMaybe "void" (infoRespJSON info)
+                , tssHeaders = infoReqHeaders info
+                }
+            }
       PathsMatch segs paths -> let
         pathsDict = go paths
         in foldl' (\dict seg -> mergeDicts dict emptyDict{ tsdSegments = HMS.singleton seg pathsDict }) dict0 segs
@@ -281,14 +297,18 @@ typeScript p additionalTypes name = case generateTypeScript p of
       [ ["{"]
       , case tsdSend dict of
           Nothing -> []
-          Just TypeScriptSend{..} ->
-            [ "\"s\": (_: SendFunctions, " <>
-              (case tssReq of
-                TSRJson j -> "req: " <> j
-                TSRMultipart -> "req: FormData"
-                TSRNoBody -> "") <>
-              ") => Promise<" <> tssResp <> ">"
-            ]
+          Just TypeScriptSend{..} -> let
+            args = T.intercalate ", " $ concat
+              [ [ "_sf: SendFunctions" ]
+              , if HMS.size tssHeaders == 0
+                  then []
+                  else [ "_hs: {" <> T.intercalate "," [T.pack (show (CI.original k)) <> if hiOptional v then "?: string" else ": string" | (k, v) <- HMS.toList tssHeaders ] <> "}" ]
+              , case tssReq of
+                  TSRJson j -> [ "req: " <> j ]
+                  TSRMultipart -> [ "req: FormData" ]
+                  TSRNoBody -> []
+              ]
+            in [ "\"s\": (" <> args <> ") => Promise<" <> tssResp <> ">" ]
       , case tsdCapture dict of
           Nothing -> []
           Just ty -> ["\"p\": (_: string) => " <> renderDictType ty <> ", "]
@@ -313,18 +333,32 @@ typeScript p additionalTypes name = case generateTypeScript p of
               TSSConst c -> T.pack (show c)
               TSSVar v -> v
             urlExpr = "sf.baseUrl + [" <> T.intercalate ", " (map segToExpr (reverse segs)) <> "].join('/')"
-            in
-              [ "\"s\": (sf: SendFunctions, " <>
-                (case tssReq of
-                  TSRJson j -> "req: " <> j
-                  TSRMultipart -> "req: FormData"
-                  TSRNoBody -> "") <>
-                "): Promise<" <> tssResp <> "> => { return " <>
-                (case tssReq of
-                  TSRJson{} -> "sf.sendJson(" <> urlExpr <> ", " <> T.pack (show tssMethod) <> ", req)"
-                  TSRMultipart{} -> "sf.sendForm(" <> urlExpr <> ", " <> T.pack (show tssMethod) <> ", req)"
-                  TSRNoBody{} -> "sf.send(" <> urlExpr <> ", " <> T.pack (show tssMethod) <> ")") <> "; },"
+            args = T.intercalate "," $ concat
+              [ [ "sf: SendFunctions" ]
+              , if HMS.size tssHeaders == 0
+                  then []
+                  else [ "headers: {" <> T.intercalate "," [T.pack (show (CI.original k)) <> if hiOptional v then "?: string" else ": string" | (k, v) <- HMS.toList tssHeaders ] <> "}" ]
+              , case tssReq of
+                  TSRJson j -> [ "req: " <> j ]
+                  TSRMultipart -> [ "req: FormData" ]
+                  TSRNoBody -> []
               ]
+            sendFunction = case tssReq of
+              TSRJson{} -> "sf.sendJson"
+              TSRMultipart{} -> "sf.sendForm"
+              TSRNoBody{} -> "sf.send"
+            sendArgs = T.intercalate "," $ concat
+              [ [ urlExpr, T.pack (show tssMethod) ]
+              , if HMS.size tssHeaders == 0
+                  then [ "{}" ]
+                  else [ "headers" ]
+              , case tssReq of
+                  TSRJson{} -> [ "req" ]
+                  TSRMultipart{} -> [ "req" ]
+                  TSRNoBody{} -> []
+              ]
+            in
+              [ "\"s\": (" <> args <> "): Promise<" <> tssResp <> "> => { return " <> sendFunction <> "(" <> sendArgs <> "); }," ]
       , case tsdCapture dict of
           Nothing -> []
           Just ty -> let
