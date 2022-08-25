@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE KindSignatures #-}
@@ -33,8 +34,8 @@ import qualified Data.DList as DL
 import Data.List (foldl')
 import Data.Monoid ((<>))
 import Control.Monad (guard)
-import qualified Data.Set as S
 import qualified Data.CaseInsensitive as CI
+import Data.Containers.ListUtils (nubOrd)
 
 {-
 export class TypeScriptRoute {
@@ -81,8 +82,8 @@ data Paths =
   | PathsNothing
   deriving (Eq, Show)
 
-generateTypeScript :: forall a. (TypeScriptRoute a) => Proxy a -> Either String (DL.DList Paths, S.Set Aeson.TSType)
-generateTypeScript _ = typeScriptRoute (Proxy @a) Info
+generateTypeScript :: forall a. (TypeScriptRoute a) => Proxy a -> Either String (DL.DList Paths, [Aeson.TSType])
+generateTypeScript _ = fmap (\(paths, types) -> (paths, nubOrd types)) $ typeScriptRoute (Proxy @a) Info
   { infoReqJSON = Nothing
   , infoReqMultiPart = False
   , infoReqHeaders = mempty
@@ -92,8 +93,8 @@ generateTypeScript _ = typeScriptRoute (Proxy @a) Info
   }
 
 class TypeScriptRoute a where
-  typeScriptRoute :: Proxy a -> Info -> Either String (DL.DList Paths, S.Set Aeson.TSType)
-  default typeScriptRoute :: (TypeScriptRoute (Rep a ())) => Proxy a -> Info -> Either String (DL.DList Paths, S.Set Aeson.TSType)
+  typeScriptRoute :: Proxy a -> Info -> Either String (DL.DList Paths, [Aeson.TSType])
+  default typeScriptRoute :: (TypeScriptRoute (Rep a ())) => Proxy a -> Info -> Either String (DL.DList Paths, [Aeson.TSType])
   typeScriptRoute _ = typeScriptRoute (Proxy @(Rep a ()))
 
 instance TypeScriptRoute (Raw a) where
@@ -108,7 +109,7 @@ instance TypeScriptRoute (RawResponse a) where
 instance (Aeson.TypeScript a) => TypeScriptRoute (JSON a) where
   typeScriptRoute _ info = return
     ( pure (PathsEnd info{infoRespJSON = Just (T.pack (Aeson.getTypeScriptType (Proxy @a)))})
-    , S.singleton (Aeson.TSType (Proxy @a))
+    , [Aeson.TSType (Proxy @a)]
     )
 
 instance (KnownSymbol seg, TypeScriptRoute next) => TypeScriptRoute (Seg seg next) where
@@ -155,7 +156,7 @@ instance (TypeScriptRoute next, Aeson.TypeScript a) => TypeScriptRoute (ReqBodyJ
     Just{} -> Left "Req body set multiple times!"
     Nothing -> do
       (paths, types) <- typeScriptRoute (Proxy @next) info{infoReqJSON = Just (T.pack (Aeson.getTypeScriptType (Proxy @a)))}
-      return (paths, S.insert (Aeson.TSType (Proxy @a)) types)
+      return (paths, (Aeson.TSType (Proxy @a)) : types)
 
 instance (TypeScriptRoute next) => TypeScriptRoute (WithIO next) where
   typeScriptRoute _ = typeScriptRoute (Proxy @next)
@@ -238,7 +239,7 @@ typeScript p additionalTypes name = case generateTypeScript p of
       [ T.pack $ Aeson.formatTSDeclarations'
           Aeson.defaultFormattingOptions{ Aeson.exportTypes = True }
           (do
-            Aeson.TSType typ <- S.toList (Aeson.getTransitiveClosure (S.union types (S.fromList additionalTypes)))
+            Aeson.TSType typ <- Aeson.getTransitiveClosure (types <> additionalTypes)
             Aeson.getTypeScriptDeclarations typ)
       , ""
       , sendFunctions
