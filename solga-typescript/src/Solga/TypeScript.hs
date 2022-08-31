@@ -237,10 +237,10 @@ typeScript p additionalTypes name = case generateTypeScript p of
     dict = go paths
     in T.unlines
       [ T.pack $ Aeson.formatTSDeclarations'
-          Aeson.defaultFormattingOptions{ Aeson.exportTypes = True }
-          (do
+          Aeson.defaultFormattingOptions{ Aeson.exportMode = Aeson.ExportEach }
+          (nubOrd (do
             Aeson.TSType typ <- Aeson.getTransitiveClosure (types <> additionalTypes)
-            Aeson.getTypeScriptDeclarations typ)
+            Aeson.getTypeScriptDeclarations typ))
       , ""
       , sendFunctions
       , ""
